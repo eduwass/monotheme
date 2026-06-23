@@ -5,7 +5,6 @@ import { join, resolve, dirname } from "node:path";
 import type { VscodeTheme } from "./load.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
 import { toGhostty } from "./adapters/ghostty.ts";
-import { slugify } from "./discover.ts";
 
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
 
@@ -20,20 +19,25 @@ export interface Target {
   reload?: (theme: VscodeTheme) => string;
 }
 
+// A fixed "slot" each tool's selector points at permanently, so switching themes
+// overwrites the slot rather than editing the tool's config (no repo churn).
+export const SLOT = "dotfiles";
+
 export const TARGETS: Target[] = [
   {
     name: "bat",
     mode: "generated",
-    dest: (t) => join(homedir(), ".config", "bat", "themes", `${t.name}.tmTheme`),
-    render: toTmTheme,
+    // config pins --theme="Dotfiles"; we overwrite the Dotfiles slot each switch.
+    dest: () => join(homedir(), ".config", "bat", "themes", "Dotfiles.tmTheme"),
+    render: (t) => toTmTheme(t, { name: "Dotfiles" }),
     // bat reads a compiled cache, so a rebuild is mandatory after writing.
     reload: () => "command -v bat >/dev/null && bat cache --build >/dev/null 2>&1 || true",
   },
   {
     name: "ghostty",
     mode: "generated",
-    // ~/.config/ghostty is symlinked into the repo; add `theme = <slug>` to use it.
-    dest: (t) => join(REPO, ".config", "ghostty", "themes", slugify(t.name)),
+    // ~/.config/ghostty is symlinked into the repo; config pins `theme = dotfiles`.
+    dest: () => join(REPO, ".config", "ghostty", "themes", SLOT),
     render: toGhostty,
     // SIGUSR2 reloads a running ghostty; no-op when it isn't running (e.g. devbox).
     reload: () => "pkill -SIGUSR2 -x ghostty 2>/dev/null || true",

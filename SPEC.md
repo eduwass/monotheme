@@ -393,10 +393,16 @@ real visual confirm.
 
 ## 10. Decisions (resolved — build to these)
 
-1. **Output: write in place.** Adapters write directly to each tool's existing config
-   path (the real repo paths in §5). Do **not** adopt omarchy's `current/theme/`
-   stable-include + atomic-swap indirection for now — matches current layout, less
-   churn. (Revisit only if rollback/atomicity becomes a real need.)
+1. **Output: write in place, but pin each tool's SELECTOR to a stable slot.**
+   Adapters write to each tool's theme path (§5). **Learning from v1:** writing the
+   theme *file* is not enough — each tool also has a *selector* (bat `--theme`, ghostty
+   `theme=`, btop `color_theme`, …) that must point at the generated theme, or the tool
+   keeps rendering its old one. Rewriting the selector on every switch would dirty the
+   repo each time (configs are symlinked in). So use a **stable slot**: the tool's config
+   permanently selects a fixed name (bat `--theme="Dotfiles"`, ghostty `theme = dotfiles`),
+   and the engine **overwrites that slot** each switch. One-time selector pin per tool
+   (a `manual` setup step), zero churn thereafter. This is the *selector half* of
+   omarchy's stable-include idea, without the full `current/theme/` atomic-swap dir.
 2. **Flat-tool UI fields: a canonical projection map + per-tool override.** Define
    `project.ts` — a **canonical semantic role set** seeded from the existing oyo
    `defs`/semantic mapping (`.config/oyo/themes/shades-of-purple.json`): text, textMuted,

@@ -6,9 +6,12 @@ import plist from "plist";
 import type { VscodeTheme } from "../load.ts";
 import { pick, stripAlpha } from "../load.ts";
 
-export function toTmTheme(theme: VscodeTheme): string {
+export function toTmTheme(theme: VscodeTheme, opts: { name?: string } = {}): string {
   const c = theme.colors;
-  const slug = theme.name.replace(/\s+/g, "-").toLowerCase();
+  // The tmTheme's internal <name> is what bat/delta select by. A target can pin a
+  // stable slot name so the tool's selector never has to change between switches.
+  const displayName = opts.name ?? theme.name;
+  const slug = displayName.replace(/\s+/g, "-").toLowerCase();
 
   const globals: Record<string, string> = {};
   const setIf = (k: string, keys: string[]) => {
@@ -40,7 +43,7 @@ export function toTmTheme(theme: VscodeTheme): string {
     });
 
   const doc = {
-    name: theme.name,
+    name: displayName,
     settings: [{ settings: globals }, ...rules],
     uuid: uuidFrom(slug),
     colorSpaceName: "sRGB",
