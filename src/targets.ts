@@ -21,7 +21,7 @@ import { toNvim } from "./adapters/nvim.ts";
 import { toVscodeTheme, toVscodeThemeManifest, labelFor } from "./adapters/vscode-theme.ts";
 import { toLazygit } from "./adapters/lazygit.ts";
 import { toTmuxPalette } from "./adapters/tmux-palette.ts";
-import { riftBorderColor, withRiftBorderColor } from "./adapters/rift-border.ts";
+import { riftBorderColor, withRiftColors } from "./adapters/rift-border.ts";
 import { nearestAccent } from "./adapters/macos-accent.ts";
 import { patchJsonStringKey } from "./util.ts";
 
@@ -325,17 +325,18 @@ export const TARGETS: Target[] = [
   {
     name: "rift-border",
     mode: "generated",
-    // Mac-only custom WM focus border. The renderer watches ui.json and reloads,
-    // so a merge-write of border.color is enough — no signal. Skip if the state
-    // file isn't there (renderer never ran / not this machine).
+    // Mac-only custom WM overlays (focus border + cursor halo + halo fx). The
+    // renderer watches ui.json and reloads both, so a merge-write of the color
+    // keys is enough — no signal. Skip if the state file isn't there (renderer
+    // never ran / not this machine).
     detect: () => process.platform === "darwin" && existsSync(join(homedir(), ".local", "state", "rift", "ui.json")),
     apply: ({ theme }) => {
       const ui = join(homedir(), ".local", "state", "rift", "ui.json");
       let obj: Record<string, unknown> = {};
       try { obj = JSON.parse(readFileSync(ui, "utf8")); } catch {}
       const color = riftBorderColor(theme);
-      writeFileSync(ui, JSON.stringify(withRiftBorderColor(obj, color), null, 2) + "\n");
-      return `rift-border → border.color = ${color}`;
+      writeFileSync(ui, JSON.stringify(withRiftColors(obj, color), null, 2) + "\n");
+      return `rift-border → border + halo + fx color = ${color}`;
     },
   },
   {
