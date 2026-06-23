@@ -17,10 +17,14 @@ import { toYaziFlavor } from "./adapters/yazi.ts";
 import { toShiki } from "./adapters/shiki.ts";
 import { toHunkCustomTheme } from "./adapters/hunk.ts";
 import { toHerdrTheme } from "./adapters/herdr.ts";
+import { toFzf } from "./adapters/fzf.ts";
 import { patchJsonStringKey } from "./util.ts";
 
 const cfg = (...p: string[]) => join(homedir(), ".config", ...p);
 const hasConfig = (...p: string[]) => () => existsSync(cfg(...p));
+const hasCmd = (cmd: string) => () => {
+  try { execSync(`command -v ${cmd}`, { stdio: "ignore" }); return true; } catch { return false; }
+};
 
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
 
@@ -197,5 +201,13 @@ export const TARGETS: Target[] = [
       try { execSync("herdr server reload-config", { stdio: "ignore" }); } catch {}
       return "herdr → [theme.custom] (reload-config)";
     },
+  },
+  {
+    name: "fzf",
+    mode: "generated",
+    detect: hasCmd("fzf"),
+    // sourced from .zshrc as FZF_DEFAULT_OPTS; next shell/fzf picks it up.
+    dest: () => cfg("fzf", "theme.sh"),
+    render: toFzf,
   },
 ];
