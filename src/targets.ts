@@ -2,7 +2,7 @@
 // reload it. Keeping this isolated keeps the engine itself OSS-portable.
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import type { VscodeTheme } from "./load.ts";
 import type { ThemeEntry } from "./discover.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
@@ -12,7 +12,13 @@ import { toBtop } from "./adapters/btop.ts";
 import { toZed, ZED_THEME_NAME } from "./adapters/zed.ts";
 import { toOpencode } from "./adapters/opencode.ts";
 import { toClaude, CLAUDE_THEME_NAME } from "./adapters/claude.ts";
+import { toYaziFlavor } from "./adapters/yazi.ts";
+import { toShiki } from "./adapters/shiki.ts";
+import { toHunkCustomTheme } from "./adapters/hunk.ts";
 import { patchJsonStringKey } from "./util.ts";
+
+const cfg = (...p: string[]) => join(homedir(), ".config", ...p);
+const hasConfig = (...p: string[]) => () => existsSync(cfg(...p));
 
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
 
@@ -24,6 +30,8 @@ export interface TargetCtx {
 export interface Target {
   name: string;
   mode: "generated" | "manual" | "selector";
+  /** only apply when this tool is present on this machine (OS/tool-aware). */
+  detect?: () => boolean;
   /** file targets: write render(theme) to dest(theme), then reload. */
   dest?: (theme: VscodeTheme) => string;
   render?: (theme: VscodeTheme) => string;
@@ -137,6 +145,40 @@ export const TARGETS: Target[] = [
       writeFileSync(join(dir, "dotfiles.json"), toClaude(theme));
       patchJsonStringKey(join(root, "settings.json"), "theme", `custom:${CLAUDE_THEME_NAME.toLowerCase()}`);
       return "claude → themes/dotfiles.json (restart to apply)";
+    },
+  },
+  {
+    name: "yazi",
+    mode: "generated",
+    detect: hasConfig("yazi"),
+    apply: ({ theme }) => {
+      const flavor = cfg("yazi", "flavors", "dotfiles.yazi");
+      mkdirSync(flavor, { recursive: true });
+      writeFileSync(join(flavor, "flavor.toml"), toYaziFlavor(theme));
+      writeFileSync(join(flavor, "tmtheme.xml"), toTmTheme(theme, { name: "Dotfiles" }));
+      // point theme.toml's flavor at the slot (stable, one-time).
+      const tt = cfg("yazi", "theme.toml");
+      if (existsSync(tt)) {
+        let s = readFileSync(tt, "utf8");
+        s = s.replace(/(\bdark\s*=\s*)"[^"]*"/, `$1"dotfiles"`).replace(/(\blight\s*=\s*)"[^"]*"/, `$1"dotfiles"`);
+        writeFileSync(tt, s);
+      }
+      return "yazi → flavors/dotfiles.yazi (relaunch to apply)";
+    },
+  },
+  {
+    name: "hunk",
+    mode: "generated",
+    detect: hasConfig("hunk", "config.toml"),
+    apply: ({ theme }) => {
+      const dir = cfg("hunk");
+      writeFileSync(join(dir, "dotfiles.json"), toShiki(theme)); // syntax_theme (shiki)
+      const conf = join(dir, "config.toml");
+      let s = readFileSync(conf, "utf8");
+      // replace the trailing [custom_theme] … (and [custom_theme.syntax]) block.
+      s = /\[custom_theme\]/.test(s) ? s.replace(/\[custom_theme\][\s\S]*$/, toHunkCustomTheme(theme)) : s + "\n" + toHunkCustomTheme(theme);
+      writeFileSync(conf, s);
+      return "hunk → [custom_theme] + dotfiles.json";
     },
   },
 ];

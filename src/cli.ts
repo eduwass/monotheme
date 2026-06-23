@@ -27,6 +27,7 @@ function applyTheme(slug: string, opSilent = false): void {
 
   for (const t of TARGETS) {
     if (t.mode === "manual") { if (!opSilent) console.log(`  - ${t.name} (manual, skipped)`); continue; }
+    if (t.detect && !t.detect()) { if (!opSilent) console.log(`  · ${t.name} (not on this machine)`); continue; }
     if (t.apply) {
       let status: string;
       try { status = t.apply({ theme, entry }); } catch (e) { status = `${t.name} (error: ${(e as Error).message})`; }
