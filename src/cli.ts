@@ -34,6 +34,9 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
     entry = e;
     theme = loadTheme(e.path);
   }
+  // many editor themes omit the `type` field (light/dark lives in the extension's
+  // uiTheme, which discovery captured as entry.appearance) — trust that.
+  theme.type = entry.appearance as "dark" | "light";
   const p = project(theme);
   if (p.warnings.length && !opSilent) for (const w of p.warnings) console.warn(`  ! ${w}`);
 
