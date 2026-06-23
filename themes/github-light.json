@@ -1,6 +1,6 @@
 {
   "name": "GitHub Light",
-  "type": "dark",
+  "type": "light",
   "colors": {
     "focusBorder": "#2188ff",
     "foreground": "#444d56",
