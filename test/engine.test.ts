@@ -141,7 +141,7 @@ test("claude: name/base/overrides with gold accent + diff colors", () => {
 test("macos-accent: maps theme accent to nearest preset", () => {
   const { nearestAccent } = require("../src/adapters/macos-accent.ts");
   expect(nearestAccent(sop).name).toBe("Yellow");   // SoP gold #FAD000
-  expect(nearestAccent(gh).name).toBe("Blue");        // GitHub blue accent
+  expect(nearestAccent(gh).name).toBe("Green");       // GitHub's accent is its green button #238636
 });
 
 test("mix: blends two hex colors for readable muted ladders", () => {
