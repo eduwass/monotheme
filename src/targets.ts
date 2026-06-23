@@ -39,7 +39,12 @@ export const TARGETS: Target[] = [
     // ~/.config/ghostty is symlinked into the repo; config pins `theme = dotfiles`.
     dest: () => join(REPO, ".config", "ghostty", "themes", SLOT),
     render: toGhostty,
-    // SIGUSR2 reloads a running ghostty; no-op when it isn't running (e.g. devbox).
-    reload: () => "pkill -SIGUSR2 -x ghostty 2>/dev/null || true",
+    // macOS ghostty ignores SIGUSR2 (config isn't auto-watched — ghostty#3643), so
+    // drive its AppleScript `perform action "reload_config"`; Linux uses SIGUSR2.
+    // Both no-op when ghostty isn't running.
+    reload: () =>
+      process.platform === "darwin"
+        ? `osascript -e 'tell application "Ghostty" to perform action "reload_config" on terminal 1' >/dev/null 2>&1 || true`
+        : "pkill -USR2 -x ghostty 2>/dev/null || true",
   },
 ];
