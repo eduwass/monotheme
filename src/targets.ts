@@ -17,6 +17,7 @@ import { toYaziFlavor } from "./adapters/yazi.ts";
 import { toShiki } from "./adapters/shiki.ts";
 import { toHerdrTheme } from "./adapters/herdr.ts";
 import { toFzf } from "./adapters/fzf.ts";
+import { toNvim } from "./adapters/nvim.ts";
 import { nearestAccent } from "./adapters/macos-accent.ts";
 import { patchJsonStringKey } from "./util.ts";
 
@@ -204,6 +205,21 @@ export const TARGETS: Target[] = [
     // sourced from .zshrc as FZF_DEFAULT_OPTS; next shell/fzf picks it up.
     dest: () => cfg("fzf", "theme.sh"),
     render: toFzf,
+  },
+  {
+    name: "nvim",
+    mode: "generated",
+    detect: hasCmd("nvim"),
+    // No per-theme nvim plugin is installed (only built-ins + shades_of_purple), so
+    // generate a complete colorscheme into the `colors/dotfiles.lua` slot. nvim's
+    // colorscheme.lua pins `colorscheme = "dotfiles"`; ~/.config/nvim is symlinked
+    // into the repo, so write the slot at the repo path (gitignored).
+    dest: () => join(REPO, ".config", "nvim", "colors", "dotfiles.lua"),
+    render: toNvim,
+    // Re-source the colorscheme live in every running nvim (best-effort over its
+    // listen sockets); no-op when none are running.
+    reload: () =>
+      `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>' 2>/dev/null; done; true`,
   },
   {
     name: "macos-accent",

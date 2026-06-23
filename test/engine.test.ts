@@ -144,6 +144,17 @@ test("macos-accent: maps theme accent to nearest preset", () => {
   expect(nearestAccent(gh).name).toBe("Green");       // GitHub's accent is its green button #238636
 });
 
+test("nvim: generates a loadable colorscheme with bg/term colors from theme", () => {
+  const { toNvim } = require("../src/adapters/nvim.ts");
+  const lua = toNvim(sop);
+  expect(lua).toContain('vim.g.colors_name = "dotfiles"');
+  expect(lua).toContain('vim.o.background = "dark"');
+  expect(lua).toContain('"Normal", { bg = "#2D2B55"'); // editor.background
+  expect(lua).toContain('vim.g.terminal_color_1 = "#EC3A37"'); // ansi red
+  // every highlight line is a well-formed hl(...) call
+  expect(lua).toContain('local hl = function(group, opts)');
+});
+
 test("mix: blends two hex colors for readable muted ladders", () => {
   const { mix } = require("../src/load.ts");
   expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
