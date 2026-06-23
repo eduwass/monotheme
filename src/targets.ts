@@ -79,13 +79,19 @@ export const SLOT = "dotfiles";
 // (rather than hanging on a TOTP prompt) when no live session exists. The peer
 // runs with --no-propagate to break the echo. Kept here as the machine-specific
 // boundary; returns null on any other host.
-export function peerThemeCommand(slug: string): { peer: string; cmd: string } | null {
-  const inner = `theme set ${slug} --no-propagate`;
+export function peerThemeCommand(themeB64: string): { peer: string; cmd: string } | null {
+  // ship the resolved theme JSON (base64) to the peer and apply it from a file —
+  // the peer needn't have the theme installed. PATH is set explicitly since
+  // non-interactive shells may not include ~/.local/bin or bun.
+  const apply =
+    `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"; mkdir -p "$HOME/.cache" && ` +
+    `echo ${themeB64} | base64 --decode > "$HOME/.cache/theme-sync.json" && ` +
+    `theme set "$HOME/.cache/theme-sync.json" --no-propagate`;
   if (process.platform === "darwin") {
-    return { peer: "devbox", cmd: `ssh -o BatchMode=yes -o ConnectTimeout=5 devbox ${JSON.stringify(inner)}` };
+    return { peer: "devbox", cmd: `ssh -o BatchMode=yes -o ConnectTimeout=8 devbox '${apply}'` };
   }
   if (process.platform === "linux") {
-    return { peer: "Mac", cmd: `devbox local ${JSON.stringify(inner)}` };
+    return { peer: "Mac", cmd: `devbox local '${apply}'` };
   }
   return null;
 }

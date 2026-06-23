@@ -16,12 +16,24 @@ import { toTmTheme } from "./adapters/tmtheme.ts";
 import { toGhostty } from "./adapters/ghostty.ts";
 
 const STATE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".state");
+// the full resolved theme that's currently active — the portable unit we sync to
+// the peer (which may not have the same themes installed) and re-apply on init.
+const ACTIVE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".active.json");
 const [cmd, ...rest] = process.argv.slice(2);
 
-function applyTheme(slug: string, opSilent = false): string {
-  const entry = resolveTheme(slug);
-  if (!entry) { console.error(`theme: unknown theme '${slug}' (try: theme list)`); process.exit(1); }
-  const theme = loadTheme(entry.path);
+// Resolve a `theme set` argument: a theme name/slug, OR a path to a theme JSON
+// (used by cross-machine sync, where the peer may not have the theme installed).
+function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canonical: string } {
+  let theme, entry;
+  if (nameOrPath.endsWith(".json") && existsSync(nameOrPath)) {
+    theme = loadTheme(nameOrPath);
+    entry = { label: theme.name, slug: slugify(theme.name), appearance: theme.type, source: "file", path: nameOrPath };
+  } else {
+    const e = resolveTheme(nameOrPath);
+    if (!e) { console.error(`theme: unknown theme '${nameOrPath}' (try: theme list)`); process.exit(1); }
+    entry = e;
+    theme = loadTheme(e.path);
+  }
   const p = project(theme);
   if (p.warnings.length && !opSilent) for (const w of p.warnings) console.warn(`  ! ${w}`);
 
@@ -42,19 +54,32 @@ function applyTheme(slug: string, opSilent = false): string {
     if (!opSilent) console.log(`  ✓ ${t.name} → ${dest.replace(process.env.HOME ?? "", "~")}`);
   }
   writeFileSync(STATE, entry.slug + "\n");
+  // canonical = the fully-resolved theme; portable across machines.
+  const canonical = JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors });
+  writeFileSync(ACTIVE, canonical + "\n");
+  // vendor editor-sourced themes into the repo's tracked themes/ dir so they're
+  // version-controlled and discoverable on every machine (devbox has no editor
+  // extensions). idempotent; commit via the normal dotfiles flow.
+  if (entry.source !== "local" && entry.source !== "file") {
+    const vendored = resolve(dirname(new URL(import.meta.url).pathname), "..", "themes", entry.slug + ".json");
+    writeFileSync(vendored, JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors }, null, 2) + "\n");
+    if (!opSilent) console.log(`  ✓ vendored → themes/${entry.slug}.json (commit to track)`);
+  }
   if (!opSilent) console.log(`\nset: ${theme.name} (${theme.type})`);
-  return entry.slug;
+  return { slug: entry.slug, canonical };
 }
 
-// Mirror the switch to the peer machine (best-effort, non-blocking).
-function propagate(slug: string): void {
-  const peer = peerThemeCommand(slug);
+// Mirror the switch to the peer machine by shipping the resolved theme itself
+// (not just its name — the peer may not have it installed). Best-effort, non-blocking.
+function propagate(canonical: string): void {
+  const b64 = Buffer.from(canonical).toString("base64");
+  const peer = peerThemeCommand(b64);
   if (!peer) return;
   try {
     execSync(peer.cmd, { stdio: "ignore", timeout: 30000 });
     console.log(`  ↪ synced ${peer.peer}`);
   } catch {
-    console.log(`  · ${peer.peer} not synced (unreachable) — it'll match next time you set it there`);
+    console.log(`  · ${peer.peer} not synced (unreachable) — it'll match next time it's set there`);
   }
 }
 
@@ -74,10 +99,10 @@ switch (cmd) {
   case "set": {
     const args = rest.filter((r) => !r.startsWith("--"));
     if (!args[0]) { console.error("usage: theme set <name> [--no-propagate]"); process.exit(1); }
-    const slug = applyTheme(args[0]);
+    const { canonical } = applyTheme(args[0]);
     // sync the peer machine unless told not to (the peer passes --no-propagate
     // back to avoid an echo loop).
-    if (!rest.includes("--no-propagate")) propagate(slug);
+    if (!rest.includes("--no-propagate")) propagate(canonical);
     break;
   }
   case "current": {
@@ -86,8 +111,10 @@ switch (cmd) {
     break;
   }
   case "init": {
-    if (!existsSync(STATE)) break; // nothing applied yet
-    applyTheme(readFileSync(STATE, "utf8").trim(), true);
+    // prefer the canonical .active.json (works even for themes not installed
+    // here, e.g. an editor theme synced from the Mac); fall back to the slug.
+    if (existsSync(ACTIVE)) applyTheme(ACTIVE, true);
+    else if (existsSync(STATE)) applyTheme(readFileSync(STATE, "utf8").trim(), true);
     break;
   }
   case "check": {
