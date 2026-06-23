@@ -50,6 +50,18 @@ export function stripAlpha(hex: string): string {
   return hex; // unexpected length — leave as-is
 }
 
+/** Composite a possibly-translucent hex (#rrggbbaa) over an opaque background,
+ *  yielding an opaque hex. Colors without an alpha channel pass through unchanged.
+ *  Themes often express diff/selection washes as a low-alpha overlay (e.g. SoP's
+ *  diff bg is bright green at 12%); tools that only accept opaque hex would paint
+ *  that as a full-saturation solid unless we flatten it over the surface first. */
+export function flattenAlpha(hex: string, bg: string): string {
+  const m = /^#([0-9a-fA-F]{8})$/.exec(hex.trim());
+  if (!m) return stripAlpha(hex);
+  const a = parseInt(m[1]!.slice(6, 8), 16) / 255;
+  return mix(bg, "#" + m[1]!.slice(0, 6), a);
+}
+
 function toRgb(hex: string): [number, number, number] {
   const h = stripAlpha(hex).replace(/^#/, "");
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];

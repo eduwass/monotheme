@@ -1,6 +1,6 @@
 // VSCode theme -> opencode theme JSON (its semantic schema, direct hex per role).
 import type { VscodeTheme } from "../load.ts";
-import { pick, stripAlpha } from "../load.ts";
+import { pick, stripAlpha, flattenAlpha } from "../load.ts";
 import { project, scopeColor } from "../project.ts";
 
 export function toOpencode(theme: VscodeTheme): string {
@@ -13,8 +13,13 @@ export function toOpencode(theme: VscodeTheme): string {
     return fb;
   };
   const dv = (hex: string) => ({ dark: hex, light: hex }); // single-appearance source
-  const addBg = pick(c, ["diffEditor.insertedLineBackground", "diffEditor.insertedTextBackground"]) ?? "#1f3320";
-  const delBg = pick(c, ["diffEditor.removedLineBackground", "diffEditor.removedTextBackground"]) ?? "#3a1f1f";
+  // Use the RAW theme value (not pick(), which strips alpha): diff backgrounds are
+  // usually a low-alpha wash meant to be composited over the editor surface. Flatten
+  // them over p.bg so opencode's opaque-hex slots get a subtle tint, not a solid bar.
+  const rawAdd = c["diffEditor.insertedLineBackground"] ?? c["diffEditor.insertedTextBackground"];
+  const rawDel = c["diffEditor.removedLineBackground"] ?? c["diffEditor.removedTextBackground"];
+  const addBg = rawAdd ? flattenAlpha(rawAdd, p.bg) : "#1f3320";
+  const delBg = rawDel ? flattenAlpha(rawDel, p.bg) : "#3a1f1f";
 
   const theme_ = {
     primary: dv(p.accent), secondary: dv(a[6]!), accent: dv(p.accent),
