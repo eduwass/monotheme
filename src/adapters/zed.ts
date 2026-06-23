@@ -12,7 +12,7 @@ export function toZed(theme: VscodeTheme): string {
   // Resolve a Zed syntax token from the theme's tokenColors the way shiki/VSCode
   // do — most-specific scope wins, color + font style resolved independently —
   // so Zed's treesitter highlighting matches what VSCode would render.
-  const st = (scopes: string[], fb: string) => {
+  const st = (scopes: (string | string[])[], fb: string) => {
     for (const s of scopes) {
       const r = resolveToken(t, s);
       if (r?.fg) {
@@ -92,8 +92,10 @@ export function toZed(theme: VscodeTheme): string {
             function: st(["entity.name.function", "meta.function-call", "support.function"], a[3]!),
             "function.method": st(["entity.name.function.member", "entity.name.function"], a[3]!),
             "function.builtin": st(["support.function"], a[3]!),
-            constructor: st(["entity.name.type.class", "entity.name.type", "entity.name.function"], a[6]!),
-            type: st(["entity.name.type", "support.type", "entity.name.class", "support.class"], a[6]!),
+            constructor: st([["source.ts", "entity.name.type"], "entity.name.type.class", "entity.name.type", "entity.name.function"], a[6]!),
+            // TS colors `source.ts entity.name.type` differently from bare (SoP:
+            // mint vs gold); TS is the dominant case so prefer the contextual color.
+            type: st([["source.ts", "entity.name.type"], "entity.name.type", "support.type", "entity.name.class", "support.class"], a[6]!),
             "type.builtin": st(["support.type.primitive", "support.type.builtin", "support.type"], a[6]!),
             number: st(["constant.numeric"], a[1]!),
             constant: st(["constant.other", "constant"], a[3]!),

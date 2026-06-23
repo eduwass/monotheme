@@ -15,7 +15,10 @@ import { project, scopeColor, resolveToken, type TokenStyle } from "../project.t
 // nvim highlight group <- ordered candidate TextMate scopes (most specific first)
 // <- fallback color. The first candidate that resolves in the theme wins; its
 // fontStyle (italic/bold/underline) carries through.
-type Row = [group: string, scopes: string[], fallback: string];
+// a candidate is a single scope OR a scope stack (outer→inner) when context
+// matters (e.g. SoP colors `source.ts entity.name.type` differently from bare).
+type Cand = string | string[];
+type Row = [group: string, scopes: Cand[], fallback: string];
 
 export function toNvim(theme: VscodeTheme): string {
   const p = project(theme);
@@ -76,7 +79,7 @@ export function toNvim(theme: VscodeTheme): string {
     ["@function.method", ["entity.name.function.member", "entity.name.function"], p.accent],
     ["@function.method.call", ["entity.name.function.member", "entity.name.function"], p.accent],
     ["@function.macro", ["entity.name.function.macro", "entity.name.function"], p.accent],
-    ["@constructor", ["entity.name.type.class", "entity.name.type", "entity.name.function"], p.fgMuted],
+    ["@constructor", [["source.ts", "entity.name.type"], "entity.name.type.class", "entity.name.type", "entity.name.function"], p.fgMuted],
     // keywords
     ["@keyword", ["keyword.control", "keyword"], a[3]!],
     ["@keyword.function", ["storage.type.function", "storage.type", "keyword.control"], a[3]!],
@@ -91,9 +94,12 @@ export function toNvim(theme: VscodeTheme): string {
     ["@keyword.modifier", ["storage.modifier", "storage.type"], a[3]!],
     ["@keyword.directive", ["keyword.control.directive", "keyword.other", "keyword"], a[3]!],
     // types
-    ["@type", ["entity.name.type", "support.type", "entity.name.class", "support.class"], p.fgMuted],
+    // bias type references to the TS context — SoP (and others) color
+    // `source.ts entity.name.type` (mint) differently from the bare scope (gold);
+    // TS is the dominant case so prefer the contextual color.
+    ["@type", [["source.ts", "entity.name.type"], "entity.name.type", "support.type", "entity.name.class", "support.class"], p.fgMuted],
     ["@type.builtin", ["support.type.primitive", "support.type.builtin", "support.type"], p.fgMuted],
-    ["@type.definition", ["entity.name.type", "support.type"], p.fgMuted],
+    ["@type.definition", [["source.ts", "entity.name.type"], "entity.name.type", "support.type"], p.fgMuted],
     ["@attribute", ["entity.other.attribute-name"], p.accent],
     // variables / properties
     ["@variable", ["variable.other.readwrite", "variable.other", "variable"], p.fg],
