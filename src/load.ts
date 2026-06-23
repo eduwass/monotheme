@@ -41,3 +41,17 @@ export function pick(colors: Record<string, string>, keys: string[]): string | u
 export function stripAlpha(hex: string): string {
   return /^#[0-9a-fA-F]{8}$/.test(hex) ? hex.slice(0, 7) : hex;
 }
+
+function toRgb(hex: string): [number, number, number] {
+  const h = stripAlpha(hex).replace(/^#/, "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/** Linearly blend two hex colors; t=0 → a, t=1 → b. Used to synthesize the
+ *  readable muted-tone gradients tools like herdr expect. */
+export function mix(a: string, b: string, t: number): string {
+  const [ar, ag, ab] = toRgb(a);
+  const [br, bg, bb] = toRgb(b);
+  const c = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, "0").toUpperCase();
+  return `#${c(ar, br)}${c(ag, bg)}${c(ab, bb)}`;
+}
