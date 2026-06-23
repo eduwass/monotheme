@@ -138,6 +138,18 @@ test("claude: name/base/overrides with gold accent + diff colors", () => {
   expect(cl.overrides.diffAdded).toBeTruthy();
 });
 
+test("macos-accent: maps theme accent to nearest preset", () => {
+  const { nearestAccent } = require("../src/adapters/macos-accent.ts");
+  expect(nearestAccent(sop).name).toBe("Yellow");   // SoP gold #FAD000
+  expect(nearestAccent(gh).name).toBe("Blue");        // GitHub blue accent
+});
+
+test("mix: blends two hex colors for readable muted ladders", () => {
+  const { mix } = require("../src/load.ts");
+  expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
+  expect(mix("#2D2B55", "#FFFFFF", 0)).toBe("#2D2B55");
+});
+
 test("slugify + discover: labels normalize, local themes are found", () => {
   expect(slugify("GitHub Dark Default")).toBe("github-dark-default");
   expect(slugify("  Shades of Purple  ")).toBe("shades-of-purple");

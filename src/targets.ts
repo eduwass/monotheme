@@ -17,6 +17,7 @@ import { toYaziFlavor } from "./adapters/yazi.ts";
 import { toShiki } from "./adapters/shiki.ts";
 import { toHerdrTheme } from "./adapters/herdr.ts";
 import { toFzf } from "./adapters/fzf.ts";
+import { nearestAccent } from "./adapters/macos-accent.ts";
 import { patchJsonStringKey } from "./util.ts";
 
 const cfg = (...p: string[]) => join(homedir(), ".config", ...p);
@@ -203,5 +204,16 @@ export const TARGETS: Target[] = [
     // sourced from .zshrc as FZF_DEFAULT_OPTS; next shell/fzf picks it up.
     dest: () => cfg("fzf", "theme.sh"),
     render: toFzf,
+  },
+  {
+    name: "macos-accent",
+    mode: "generated",
+    detect: () => process.platform === "darwin", // no custom-hex API; nearest of 8 presets
+    apply: ({ theme }) => {
+      const p = nearestAccent(theme);
+      execSync(`defaults write -g AppleAccentColor -int ${p.int}`, { stdio: "ignore" });
+      execSync(`defaults write -g AppleHighlightColor -string ${JSON.stringify(p.highlight)}`, { stdio: "ignore" });
+      return `macos-accent → ${p.name} (nearest preset; relaunch apps to fully apply)`;
+    },
   },
 ];
