@@ -218,9 +218,12 @@ export const TARGETS: Target[] = [
     dest: () => join(REPO, ".config", "nvim", "colors", "dotfiles.lua"),
     render: toNvim,
     // Re-source the colorscheme live in every running nvim (best-effort over its
-    // listen sockets); no-op when none are running.
+    // listen sockets); no-op when none are running. nvim's default socket lives
+    // under $XDG_RUNTIME_DIR on Linux but under $TMPDIR/nvim.<user>/<rand>/ on
+    // macOS (XDG_RUNTIME_DIR is unset there), so glob both layouts. /bin/sh leaves
+    // unmatched globs literal, and the `[ -S ]` test filters those out.
     reload: () =>
-      `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>' 2>/dev/null; done; true`,
+      `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>' 2>/dev/null; done; true`,
   },
   {
     name: "lazygit",
