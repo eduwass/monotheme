@@ -308,19 +308,11 @@ export const TARGETS: Target[] = [
     name: "lazygit",
     mode: "generated",
     detect: hasConfig("lazygit", "config.yml"),
-    // config.yml isn't symlinked into the repo; rewrite the contiguous gui.theme
-    // block in place (preserving git.pagers etc). lazygit reads config on launch,
-    // so it applies next start — no live reload.
-    apply: ({ theme }) => {
-      const conf = cfg("lazygit", "config.yml");
-      let s = readFileSync(conf, "utf8");
-      const block = toLazygit(theme);
-      // match `  theme:` + all lines indented deeper than the gui-key level.
-      const re = /^ {2}theme:\n(?: {4}.*\n| *\n)*/m;
-      s = re.test(s) ? s.replace(re, block) : s.replace(/^gui:\n/m, `gui:\n${block}`);
-      writeFileSync(conf, s);
-      return "lazygit → gui.theme (relaunch to apply)";
-    },
+    // Write the theme to a standalone slot file (NOT the tracked config.yml — that
+    // churned the repo every switch). lazygit merges it last via LG_CONFIG_FILE
+    // (set in .zshrc): `config.yml:theme.yml`. Applies next launch — no live reload.
+    dest: () => cfg("lazygit", "theme.yml"),
+    render: toLazygit,
   },
   {
     name: "rift-border",

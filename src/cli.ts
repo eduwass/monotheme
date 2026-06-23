@@ -65,10 +65,15 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
   // vendor editor-sourced themes into the repo's tracked themes/ dir so they're
   // version-controlled and discoverable on every machine (devbox has no editor
   // extensions). idempotent; commit via the normal dotfiles flow.
+  // Only vendor ONCE (when missing) — rewriting on every switch reserializes the
+  // file, stripping authored comments and reordering keys, which churns the repo
+  // on each theme change. A present vendored copy is already the source of truth.
   if (entry.source !== "local" && entry.source !== "file") {
     const vendored = resolve(dirname(new URL(import.meta.url).pathname), "..", "themes", entry.slug + ".json");
-    writeFileSync(vendored, JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors }, null, 2) + "\n");
-    if (!opSilent) console.log(`  ✓ vendored → themes/${entry.slug}.json (commit to track)`);
+    if (!existsSync(vendored)) {
+      writeFileSync(vendored, JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors }, null, 2) + "\n");
+      if (!opSilent) console.log(`  ✓ vendored → themes/${entry.slug}.json (commit to track)`);
+    }
   }
   if (!opSilent) console.log(`\nset: ${theme.name} (${theme.type})`);
   return { slug: entry.slug, canonical };
