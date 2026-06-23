@@ -4,6 +4,7 @@
 //   theme set <name>           project a theme to all targets + reload
 //   theme current              show the active theme
 //   theme init                 re-apply the active theme (run from shell rc)
+//   theme raycast              open the active theme as a Raycast import (one click)
 //   theme check                self-check (no writes)
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -14,6 +15,7 @@ import { discover, resolveTheme, slugify } from "./discover.ts";
 import { TARGETS, peerThemeCommand } from "./targets.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
 import { toGhostty } from "./adapters/ghostty.ts";
+import { raycastImportUrl } from "./adapters/raycast.ts";
 
 const STATE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".state");
 // the full resolved theme that's currently active — the portable unit we sync to
@@ -120,12 +122,26 @@ switch (cmd) {
     else if (existsSync(STATE)) applyTheme(readFileSync(STATE, "utf8").trim(), true);
     break;
   }
+  case "raycast": {
+    // Raycast stores themes in an encrypted DB (no silent write), so the only
+    // sanctioned apply path is its import deeplink — one confirm click. Build it
+    // from the active theme and open it (Mac-only; from devbox, via `devbox local`).
+    let theme;
+    if (existsSync(ACTIVE)) theme = loadTheme(ACTIVE);
+    else if (existsSync(STATE)) theme = loadTheme(resolveTheme(readFileSync(STATE, "utf8").trim())!.path);
+    else { console.error("theme: no active theme (run: theme set <name>)"); process.exit(1); }
+    const url = raycastImportUrl(theme);
+    const open = process.platform === "darwin" ? `open '${url}'` : `devbox local "open '${url}'"`;
+    try { execSync(open, { stdio: "ignore" }); console.log(`raycast: opened import for ${theme.name} — confirm in Raycast`); }
+    catch { console.log(`raycast: open this to import:\n  ${url}`); }
+    break;
+  }
   case "check": {
     runCheck();
     break;
   }
   default:
-    console.log("usage: theme <list|set|current|init|check> [name]");
+    console.log("usage: theme <list|set|current|init|raycast|check> [name]");
     process.exit(cmd ? 1 : 0);
 }
 
