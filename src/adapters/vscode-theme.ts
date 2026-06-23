@@ -6,7 +6,11 @@
 import type { VscodeTheme, TokenColor } from "../load.ts";
 import { stripAlpha } from "../load.ts";
 
-export const NVIM_TM_THEME = "Dotfiles";
+// nvim-textmate's C module caches parsed themes BY NAME, and exposes no reload —
+// so a stable name ("Dotfiles") never re-reads the rewritten file on switch
+// (dark↔light breaks). Register each theme under its OWN name instead: a real
+// switch is then always a cache miss → fresh read.
+export const labelFor = (theme: VscodeTheme) => `Dotfiles ${theme.name}`;
 
 // nvim-textmate's C color parser wants #rrggbb — normalize #rgb shorthand / alpha
 // (raw editor themes like github-light use "#fff", which renders as black).
@@ -24,10 +28,10 @@ function normTokens(tokens: TokenColor[]): TokenColor[] {
   );
 }
 
-/** The VSCode theme JSON (colors + tokenColors) under the stable name. */
+/** The VSCode theme JSON (colors + tokenColors) under a per-theme name. */
 export function toVscodeTheme(theme: VscodeTheme): string {
   return JSON.stringify(
-    { name: NVIM_TM_THEME, type: theme.type, colors: normColors(theme.colors), tokenColors: normTokens(theme.tokenColors) },
+    { name: labelFor(theme), type: theme.type, colors: normColors(theme.colors), tokenColors: normTokens(theme.tokenColors) },
     null,
     2,
   ) + "\n";
@@ -43,7 +47,7 @@ export function toVscodeThemeManifest(theme: VscodeTheme): string {
       engines: { vscode: "*" },
       contributes: {
         themes: [
-          { label: NVIM_TM_THEME, uiTheme: theme.type === "light" ? "vs" : "vs-dark", path: "./themes/dotfiles.json" },
+          { label: labelFor(theme), uiTheme: theme.type === "light" ? "vs" : "vs-dark", path: "./themes/dotfiles.json" },
         ],
       },
     },

@@ -18,7 +18,7 @@ import { toShiki } from "./adapters/shiki.ts";
 import { toHerdrTheme } from "./adapters/herdr.ts";
 import { toFzf } from "./adapters/fzf.ts";
 import { toNvim } from "./adapters/nvim.ts";
-import { toVscodeTheme, toVscodeThemeManifest, NVIM_TM_THEME } from "./adapters/vscode-theme.ts";
+import { toVscodeTheme, toVscodeThemeManifest, labelFor } from "./adapters/vscode-theme.ts";
 import { toLazygit } from "./adapters/lazygit.ts";
 import { nearestAccent } from "./adapters/macos-accent.ts";
 import { patchJsonStringKey } from "./util.ts";
@@ -224,22 +224,28 @@ export const TARGETS: Target[] = [
       const colors = join(nvimDir, "colors", "dotfiles.lua");
       mkdirSync(dirname(colors), { recursive: true });
       writeFileSync(colors, toNvim(theme));
-      // (2) a self-contained "Dotfiles" VSCode theme + extension manifest for
-      // nvim-textmate (one stable name, no per-theme variant/naming quirks).
+      // (2) a self-contained VSCode theme + extension manifest for nvim-textmate,
+      // registered under a per-theme label (cache-busts the plugin's by-name theme
+      // cache so live dark↔light switches actually re-read the file).
+      const label = labelFor(theme);
       const extDir = join(nvimDir, "tm-extensions", "dotfiles");
       mkdirSync(join(extDir, "themes"), { recursive: true });
       writeFileSync(join(extDir, "package.json"), toVscodeThemeManifest(theme));
       writeFileSync(join(extDir, "themes", "dotfiles.json"), toVscodeTheme(theme));
+      // startup config reads the current label from here.
+      writeFileSync(join(extDir, "current.txt"), label + "\n");
       // Live-reload running nvims over their listen sockets (default socket is
       // under $XDG_RUNTIME_DIR on Linux, $TMPDIR/nvim.<user>/<rand>/ on macOS).
-      // Reapply chrome (:colorscheme) + syntax (:TxMtTheme Dotfiles). silent! so it
-      // no-ops quietly where nvim-textmate isn't loaded yet (E492). /bin/sh leaves
-      // unmatched globs literal; the `[ -S ]` test filters them out.
+      // Reapply chrome (:colorscheme) + switch nvim-textmate to the new per-theme
+      // label (:TxMtTheme): the unique name cache-busts its by-name theme cache so
+      // a dark↔light switch re-reads our rewritten slot. silent! no-ops where the
+      // plugin isn't loaded yet (E492). Label has spaces → fine inside the
+      // single-quoted remote-send string.
       execSync(
-        `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>:silent! TxMtTheme ${NVIM_TM_THEME}<CR>' 2>/dev/null; done; true`,
+        `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>:silent! TxMtTheme ${label}<CR>' 2>/dev/null; done; true`,
         { stdio: "ignore" },
       );
-      return `nvim → colors/dotfiles.lua (chrome) + tm-extensions/dotfiles (${NVIM_TM_THEME})`;
+      return `nvim → colors/dotfiles.lua (chrome) + tm-extensions (${label})`;
     },
   },
   {
