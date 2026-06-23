@@ -99,9 +99,12 @@ export function toNvim(theme: VscodeTheme): string {
     ["@variable", ["variable.other.readwrite", "variable.other", "variable"], p.fg],
     ["@variable.builtin", ["variable.language", "variable.language.this", "support.variable"], a[6]!],
     ["@variable.parameter", ["variable.parameter"], p.fg],
-    // member access (obj.x) vs object-literal keys ({x: ...}) often differ in
-    // VSCode themes (SoP: gold vs cyan); treesitter splits them, so mirror that.
-    ["@variable.member", ["variable.other.property", "support.type.property-name", "meta.object-literal.key"], a[6]!],
+    // ponytail: treesitter captures BOTH object-literal keys ({x: ...}) and member
+    // access (obj.x) as @variable.member — it can't tell them apart, while VSCode
+    // colors them differently (SoP: cyan keys vs gold access). Object keys are the
+    // dominant case, so resolve to the cyan object-key scope; member access inherits
+    // the same cyan (acceptable, no separate capture exists to split on).
+    ["@variable.member", ["meta.object-literal.key", "support.type.property-name", "variable.other.property"], a[6]!],
     ["@property", ["meta.object-literal.key", "support.type.property-name", "variable.other.property"], a[6]!],
     ["@field", ["meta.object-literal.key", "support.type.property-name", "variable.other.property"], a[6]!],
     ["@module", ["entity.name.namespace", "entity.name.type.module", "support.other.namespace"], p.fgMuted],

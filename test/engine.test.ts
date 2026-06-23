@@ -103,7 +103,7 @@ test("zed: valid theme family with style + syntax + ansi", () => {
   const syn = z.themes[0].style.syntax;
   expect(syn.comment).toMatchObject({ color: "#B362FF", font_style: "italic" });
   expect(syn.property.color).toBe("#9EFFFF");          // object-literal keys (cyan)
-  expect(syn["variable.member"].color).toBe("#FAD000"); // member access (gold)
+  expect(syn["variable.member"].color).toBe("#9EFFFF"); // treesitter can't split keys/access — cyan
 });
 
 test("patchJsonStringKey: replaces existing key, inserts missing, preserves rest", () => {
@@ -155,8 +155,9 @@ test("resolveToken: TextMate parity — color + fontStyle resolved independently
   expect(resolveToken(t, "comment")).toMatchObject({ fg: "#B362FF", italic: true });
   // object keys are cyan in SoP (the screenshot parity case)
   expect(resolveToken(t, "meta.object-literal.key")?.fg).toBe("#9EFFFF");
-  // dotted-prefix: a specific scope falls back to its parent rule
-  expect(resolveToken(t, "constant.numeric.decimal")?.fg).toBe("#FFEE80");
+  // dotted-prefix: constant.numeric.* falls back to SoP's "constant" rule (pink,
+  // as shiki itself resolves it — verified by the shiki-parity oracle)
+  expect(resolveToken(t, "constant.numeric.decimal")?.fg).toBe("#FF628C");
   // unknown scope → undefined (caller falls back)
   expect(resolveToken(t, "totally.made.up.scope")).toBeUndefined();
 });

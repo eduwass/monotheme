@@ -101,9 +101,10 @@ export function toZed(theme: VscodeTheme): string {
             boolean: st(["constant.language.boolean", "constant.language"], a[1]!),
             variable: st(["variable.other.readwrite", "variable.other", "variable"], p.fg),
             "variable.special": st(["variable.language", "variable.language.this", "support.variable"], a[5]!),
-            "variable.member": st(["variable.other.property", "support.type.property-name", "meta.object-literal.key"], p.fg),
-            // object-literal keys vs member access differ in many themes (SoP: cyan
-            // vs gold) — match VSCode by preferring the object-key scope here.
+            // ponytail: treesitter lumps object-literal keys and member access into
+            // one capture (it can't split them like TextMate does); object keys are
+            // the dominant case, so resolve to the cyan object-key scope.
+            "variable.member": st(["meta.object-literal.key", "support.type.property-name", "variable.other.property"], p.fg),
             property: st(["meta.object-literal.key", "support.type.property-name", "variable.other.property"], p.fg),
             attribute: st(["entity.other.attribute-name"], a[3]!),
             operator: st(["keyword.operator"], a[6]!),
