@@ -230,7 +230,9 @@ export const TARGETS: Target[] = [
       // under $XDG_RUNTIME_DIR on Linux, $TMPDIR/nvim.<user>/<rand>/ on macOS).
       // Reapply chrome (:colorscheme) + syntax (:TxMtTheme <label>). /bin/sh leaves
       // unmatched globs literal; the `[ -S ]` test filters them out.
-      const tx = label ? `:TxMtTheme ${label}<CR>` : "";
+      // silent! so it no-ops quietly in nvims where nvim-textmate isn't loaded
+      // yet (e.g. before the user restarts) instead of throwing E492.
+      const tx = label ? `:silent! TxMtTheme ${label}<CR>` : "";
       execSync(
         `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>${tx}' 2>/dev/null; done; true`,
         { stdio: "ignore" },

@@ -23,6 +23,12 @@ test("stripAlpha: drops 8-digit alpha, passes 6-digit through", () => {
   expect(stripAlpha("#58a6ff")).toBe("#58a6ff");
 });
 
+test("stripAlpha: expands #rgb/#rgba shorthand to #rrggbb (nvim_set_hl needs it)", () => {
+  expect(stripAlpha("#fff")).toBe("#ffffff");
+  expect(stripAlpha("#0a0")).toBe("#00aa00");
+  expect(stripAlpha("#1234")).toBe("#112233"); // #rgba → drop alpha
+});
+
 test("ANSI: SoP maps all 16 slots from terminal.ansi* (alpha stripped)", () => {
   const p = project(sop);
   expect(p.ansi).toHaveLength(16);

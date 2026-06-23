@@ -37,9 +37,17 @@ export function pick(colors: Record<string, string>, keys: string[]): string | u
   return undefined;
 }
 
-/** Drop an 8-digit hex alpha channel — most terminal/TUI configs want #rrggbb. */
+/** Normalize a hex color to #rrggbb: expand #rgb/#rgba shorthand and drop an
+ *  alpha channel. Most terminals/TUIs (and nvim_set_hl) reject shorthand/alpha. */
 export function stripAlpha(hex: string): string {
-  return /^#[0-9a-fA-F]{8}$/.test(hex) ? hex.slice(0, 7) : hex;
+  const m = /^#([0-9a-fA-F]{3,8})$/.exec(hex);
+  if (!m) return hex;
+  const h = m[1]!;
+  // #rgb / #rgba → #rrggbb (duplicate each of the first 3 nibbles)
+  if (h.length === 3 || h.length === 4) return "#" + h.slice(0, 3).replace(/./g, (c) => c + c);
+  // #rrggbb / #rrggbbaa → #rrggbb
+  if (h.length === 6 || h.length === 8) return "#" + h.slice(0, 6);
+  return hex; // unexpected length — leave as-is
 }
 
 function toRgb(hex: string): [number, number, number] {
