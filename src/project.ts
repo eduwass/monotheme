@@ -24,7 +24,7 @@ export interface Projection {
   warnings: string[];
 }
 
-const ANSI_KEYS = [
+export const ANSI_KEYS = [
   "terminal.ansiBlack", "terminal.ansiRed", "terminal.ansiGreen", "terminal.ansiYellow",
   "terminal.ansiBlue", "terminal.ansiMagenta", "terminal.ansiCyan", "terminal.ansiWhite",
   "terminal.ansiBrightBlack", "terminal.ansiBrightRed", "terminal.ansiBrightGreen",

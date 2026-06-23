@@ -4,9 +4,12 @@
   "type": "module",
   "private": true,
   "description": "One source of truth (a VSCode theme) projected into every tool's native format.",
-  "bin": { "theme": "./src/cli.ts" },
+  "bin": {
+    "theme": "./src/cli.ts"
+  },
   "scripts": {
-    "check": "bun run src/cli.ts check"
+    "check": "bun run src/cli.ts check",
+    "test": "bun test"
   },
   "dependencies": {
     "json5": "^2.2.3",
