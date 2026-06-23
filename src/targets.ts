@@ -20,6 +20,7 @@ import { toFzf } from "./adapters/fzf.ts";
 import { toNvim } from "./adapters/nvim.ts";
 import { toVscodeTheme, toVscodeThemeManifest, labelFor } from "./adapters/vscode-theme.ts";
 import { toLazygit } from "./adapters/lazygit.ts";
+import { toTmuxPalette } from "./adapters/tmux-palette.ts";
 import { nearestAccent } from "./adapters/macos-accent.ts";
 import { patchJsonStringKey } from "./util.ts";
 
@@ -284,6 +285,22 @@ export const TARGETS: Target[] = [
         { stdio: "ignore" },
       );
       return `nvim → colors/dotfiles.lua (chrome) + tm-extensions (${label})`;
+    },
+  },
+  {
+    name: "tmux-palette",
+    mode: "generated",
+    detect: hasConfig("tmux-palette"),
+    // Write the projected 6-color theme into a stable "dotfiles" user-theme slot
+    // and point theme.json at it. Each popup is a fresh process that re-reads disk,
+    // so no live-reload signal is needed — the next palette open picks it up.
+    apply: ({ theme }) => {
+      const root = cfg("tmux-palette");
+      const dir = join(root, "themes");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "dotfiles.json"), JSON.stringify(toTmuxPalette(theme), null, 2) + "\n");
+      writeFileSync(join(root, "theme.json"), JSON.stringify({ name: "dotfiles" }, null, 2) + "\n");
+      return "tmux-palette → themes/dotfiles.json (theme.json = dotfiles)";
     },
   },
   {
