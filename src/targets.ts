@@ -72,6 +72,24 @@ function editorSelector(name: string, appDir: string): Target {
 // overwrites the slot rather than editing the tool's config (no repo churn).
 export const SLOT = "dotfiles";
 
+// Cross-machine theme sync (the user's two-machine Mac+devbox setup): after
+// applying locally, mirror the switch to the peer so every CLI on both machines
+// tracks the same theme. devbox→Mac uses the always-on `devbox local`
+// ControlMaster; Mac→devbox uses Tailscale SSH with BatchMode so it fails fast
+// (rather than hanging on a TOTP prompt) when no live session exists. The peer
+// runs with --no-propagate to break the echo. Kept here as the machine-specific
+// boundary; returns null on any other host.
+export function peerThemeCommand(slug: string): { peer: string; cmd: string } | null {
+  const inner = `theme set ${slug} --no-propagate`;
+  if (process.platform === "darwin") {
+    return { peer: "devbox", cmd: `ssh -o BatchMode=yes -o ConnectTimeout=5 devbox ${JSON.stringify(inner)}` };
+  }
+  if (process.platform === "linux") {
+    return { peer: "Mac", cmd: `devbox local ${JSON.stringify(inner)}` };
+  }
+  return null;
+}
+
 export const TARGETS: Target[] = [
   {
     name: "bat",

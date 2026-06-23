@@ -11,14 +11,14 @@ import { execSync } from "node:child_process";
 import { loadTheme, stripAlpha } from "./load.ts";
 import { project } from "./project.ts";
 import { discover, resolveTheme, slugify } from "./discover.ts";
-import { TARGETS } from "./targets.ts";
+import { TARGETS, peerThemeCommand } from "./targets.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
 import { toGhostty } from "./adapters/ghostty.ts";
 
 const STATE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".state");
 const [cmd, ...rest] = process.argv.slice(2);
 
-function applyTheme(slug: string, opSilent = false): void {
+function applyTheme(slug: string, opSilent = false): string {
   const entry = resolveTheme(slug);
   if (!entry) { console.error(`theme: unknown theme '${slug}' (try: theme list)`); process.exit(1); }
   const theme = loadTheme(entry.path);
@@ -43,6 +43,19 @@ function applyTheme(slug: string, opSilent = false): void {
   }
   writeFileSync(STATE, entry.slug + "\n");
   if (!opSilent) console.log(`\nset: ${theme.name} (${theme.type})`);
+  return entry.slug;
+}
+
+// Mirror the switch to the peer machine (best-effort, non-blocking).
+function propagate(slug: string): void {
+  const peer = peerThemeCommand(slug);
+  if (!peer) return;
+  try {
+    execSync(peer.cmd, { stdio: "ignore", timeout: 30000 });
+    console.log(`  ↪ synced ${peer.peer}`);
+  } catch {
+    console.log(`  · ${peer.peer} not synced (unreachable) — it'll match next time you set it there`);
+  }
 }
 
 switch (cmd) {
@@ -59,8 +72,12 @@ switch (cmd) {
     break;
   }
   case "set": {
-    if (!rest[0]) { console.error("usage: theme set <name>"); process.exit(1); }
-    applyTheme(rest[0]);
+    const args = rest.filter((r) => !r.startsWith("--"));
+    if (!args[0]) { console.error("usage: theme set <name> [--no-propagate]"); process.exit(1); }
+    const slug = applyTheme(args[0]);
+    // sync the peer machine unless told not to (the peer passes --no-propagate
+    // back to avoid an echo loop).
+    if (!rest.includes("--no-propagate")) propagate(slug);
     break;
   }
   case "current": {
