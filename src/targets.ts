@@ -15,7 +15,6 @@ import { toOpencode } from "./adapters/opencode.ts";
 import { toClaude, CLAUDE_THEME_NAME } from "./adapters/claude.ts";
 import { toYaziFlavor } from "./adapters/yazi.ts";
 import { toShiki } from "./adapters/shiki.ts";
-import { toHunkCustomTheme } from "./adapters/hunk.ts";
 import { toHerdrTheme } from "./adapters/herdr.ts";
 import { toFzf } from "./adapters/fzf.ts";
 import { patchJsonStringKey } from "./util.ts";
@@ -176,16 +175,11 @@ export const TARGETS: Target[] = [
     name: "hunk",
     mode: "generated",
     detect: hasConfig("hunk", "config.toml"),
-    apply: ({ theme }) => {
-      const dir = cfg("hunk");
-      writeFileSync(join(dir, "dotfiles.json"), toShiki(theme)); // syntax_theme (shiki)
-      const conf = join(dir, "config.toml");
-      let s = readFileSync(conf, "utf8");
-      // replace the trailing [custom_theme] … (and [custom_theme.syntax]) block.
-      s = /\[custom_theme\]/.test(s) ? s.replace(/\[custom_theme\][\s\S]*$/, toHunkCustomTheme(theme)) : s + "\n" + toHunkCustomTheme(theme);
-      writeFileSync(conf, s);
-      return "hunk → [custom_theme] + dotfiles.json";
-    },
+    // hunk consumes a shiki/VSCode theme via syntax_theme out of the box — just
+    // (re)write that slot. UI [custom_theme] stays hand-tuned (not engine-managed),
+    // so config.toml never churns.
+    dest: () => cfg("hunk", "dotfiles.json"),
+    render: toShiki,
   },
   {
     name: "herdr",
