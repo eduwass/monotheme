@@ -43,6 +43,57 @@ export function scopeColor(tokens: TokenColor[], scope: string): string | undefi
   return undefined;
 }
 
+export interface TokenStyle {
+  fg?: string;
+  italic?: boolean;
+  bold?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+}
+
+// A theme rule selector matches a target scope when it's equal or a dot-prefix
+// (TextMate descendant rule on dot boundaries). For selectors with spaces
+// (descendant selectors like "meta.x entity.y") the rightmost component is the
+// element being styled, so match against that.
+function selectorScore(selector: string, target: string): number {
+  const key = selector.trim().split(/\s+/).pop()!;
+  if (!key) return -1;
+  if (target === key || target.startsWith(key + ".")) return key.split(".").length;
+  return -1;
+}
+
+/**
+ * Resolve a TextMate scope to the color + font style the theme gives it, the
+ * same way shiki/VSCode do: among all matching tokenColor rules, the most
+ * specific selector wins; ties break toward the later (overriding) rule.
+ */
+export function resolveToken(tokens: TokenColor[], scope: string): TokenStyle | undefined {
+  // foreground and fontStyle resolve independently (TextMate): a later
+  // fontStyle-only rule adds italic without clobbering an earlier color.
+  let fgTok: TokenColor | undefined, fgScore = 0;
+  let fsTok: TokenColor | undefined, fsScore = 0, matched = false;
+  tokens.forEach((t) => {
+    const scopes = Array.isArray(t.scope) ? t.scope : t.scope ? [t.scope] : [];
+    let score = 0;
+    for (const group of scopes) {
+      for (const sel of group.split(",")) score = Math.max(score, selectorScore(sel, scope));
+    }
+    if (score === 0) return;
+    matched = true;
+    if (t.settings?.foreground && score >= fgScore) { fgScore = score; fgTok = t; }
+    if (t.settings?.fontStyle !== undefined && score >= fsScore) { fsScore = score; fsTok = t; }
+  });
+  if (!matched) return undefined;
+  const fs = fsTok?.settings?.fontStyle ?? "";
+  return {
+    fg: fgTok?.settings?.foreground ? stripAlpha(fgTok.settings.foreground) : undefined,
+    italic: /\bitalic\b/.test(fs),
+    bold: /\bbold\b/.test(fs),
+    underline: /\bunderline\b/.test(fs),
+    strikethrough: /\bstrikethrough\b/.test(fs),
+  };
+}
+
 export function project(theme: VscodeTheme): Projection {
   const c = theme.colors;
   const t = theme.tokenColors;

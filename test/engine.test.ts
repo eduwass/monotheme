@@ -98,8 +98,12 @@ test("zed: valid theme family with style + syntax + ansi", () => {
   expect(z.themes[0].appearance).toBe("dark");
   expect(z.themes[0].style.background).toBe("#2D2B55");
   expect(z.themes[0].style["terminal.ansi.red"]).toBe("#EC3A37");
-  expect(z.themes[0].style.syntax.comment.color).toBeTruthy();
   expect(z.themes[0].style["text.accent"]).toBe("#FAD000");
+  // syntax resolved from tokenColors (VSCode parity), not naive fallbacks
+  const syn = z.themes[0].style.syntax;
+  expect(syn.comment).toMatchObject({ color: "#B362FF", font_style: "italic" });
+  expect(syn.property.color).toBe("#9EFFFF");          // object-literal keys (cyan)
+  expect(syn["variable.member"].color).toBe("#FAD000"); // member access (gold)
 });
 
 test("patchJsonStringKey: replaces existing key, inserts missing, preserves rest", () => {
@@ -144,15 +148,31 @@ test("macos-accent: maps theme accent to nearest preset", () => {
   expect(nearestAccent(gh).name).toBe("Green");       // GitHub's accent is its green button #238636
 });
 
-test("nvim: generates a loadable colorscheme with bg/term colors from theme", () => {
+test("resolveToken: TextMate parity — color + fontStyle resolved independently", () => {
+  const { resolveToken } = require("../src/project.ts");
+  const t = sop.tokenColors;
+  // comment: foreground from one rule, italic from a later style-only rule
+  expect(resolveToken(t, "comment")).toMatchObject({ fg: "#B362FF", italic: true });
+  // object keys are cyan in SoP (the screenshot parity case)
+  expect(resolveToken(t, "meta.object-literal.key")?.fg).toBe("#9EFFFF");
+  // dotted-prefix: a specific scope falls back to its parent rule
+  expect(resolveToken(t, "constant.numeric.decimal")?.fg).toBe("#FFEE80");
+  // unknown scope → undefined (caller falls back)
+  expect(resolveToken(t, "totally.made.up.scope")).toBeUndefined();
+});
+
+test("nvim: colorscheme carries resolved syntax (VSCode parity) + chrome + term", () => {
   const { toNvim } = require("../src/adapters/nvim.ts");
   const lua = toNvim(sop);
   expect(lua).toContain('vim.g.colors_name = "dotfiles"');
   expect(lua).toContain('vim.o.background = "dark"');
   expect(lua).toContain('"Normal", { bg = "#2D2B55"'); // editor.background
   expect(lua).toContain('vim.g.terminal_color_1 = "#EC3A37"'); // ansi red
-  // every highlight line is a well-formed hl(...) call
   expect(lua).toContain('local hl = function(group, opts)');
+  // syntax resolved from tokenColors, not hardcoded
+  expect(lua).toContain('hl("@comment", { fg = "#B362FF", italic = true })');
+  expect(lua).toContain('hl("@property", { fg = "#9EFFFF" })'); // cyan object keys
+  expect(lua).toContain('hl("Comment", { link = "@comment" })'); // legacy links
 });
 
 test("lazygit: theme block maps roles + in-place replace preserves git.pagers", () => {

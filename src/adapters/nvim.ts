@@ -1,22 +1,39 @@
-// VSCode theme -> a complete nvim colorscheme (colors/dotfiles.lua). Mirrors the
-// user's hand-tuned override structure (editor, syntax, treesitter, plugin groups)
-// but derives every color from the active theme, so nvim follows theme switches.
+// VSCode theme -> a complete nvim colorscheme (colors/dotfiles.lua). Editor/UI
+// chrome comes from the projection role set; syntax + treesitter highlighting is
+// resolved straight from the theme's tokenColors[] (the same data shiki/VSCode
+// read) via resolveToken, so a given token kind gets the color AND font style
+// VSCode would give it.
+//
+// ponytail: nvim highlights with treesitter, VSCode/shiki with TextMate grammars,
+// which tokenize source differently — so highlighting is color-faithful per token
+// kind, not byte-identical. Upgrade path for true parity would be a TextMate
+// engine in nvim (none robust today).
 import type { VscodeTheme } from "../load.ts";
 import { mix } from "../load.ts";
-import { project, scopeColor } from "../project.ts";
+import { project, scopeColor, resolveToken, type TokenStyle } from "../project.ts";
+
+// nvim highlight group <- ordered candidate TextMate scopes (most specific first)
+// <- fallback color. The first candidate that resolves in the theme wins; its
+// fontStyle (italic/bold/underline) carries through.
+type Row = [group: string, scopes: string[], fallback: string];
 
 export function toNvim(theme: VscodeTheme): string {
   const p = project(theme);
   const a = p.ansi;
   const t = theme.tokenColors;
-  const sx = (scopes: string[], fb: string) => {
-    for (const s of scopes) { const v = scopeColor(t, s); if (v) return v; }
-    return fb;
+
+  // resolve a scope chain to {fg,italic,...}; fall back to a projection color.
+  const rt = (scopes: string[], fallback: string): TokenStyle => {
+    for (const s of scopes) {
+      const r = resolveToken(t, s);
+      if (r?.fg) return r;
+    }
+    return { fg: fallback };
   };
-  // palette derived from the theme (matches the user's ~15-color SoP palette roles)
+
   const c = {
     bg: p.bg,
-    panel: mix(p.bg, "#000000", 0.22),     // floats / sidebars / statusline
+    panel: mix(p.bg, "#000000", 0.22),
     cursorLine: mix(p.bg, "#000000", 0.12),
     fg: p.fg,
     muted: p.fgMuted,
@@ -24,14 +41,6 @@ export function toNvim(theme: VscodeTheme): string {
     indent: mix(p.bg, p.fgMuted, 0.28),
     visual: p.selection,
     accent: p.accent,
-    comment: sx(["comment"], a[5]!),
-    string: sx(["string"], a[2]!),
-    number: sx(["constant.numeric"], a[1]!),
-    keyword: sx(["keyword", "storage.type"], a[3]!),
-    func: sx(["entity.name.function"], p.accent),
-    type: sx(["entity.name.type", "support.type"], p.fgMuted),
-    cyan: sx(["variable.other.property", "support.type.property-name"], a[6]!),
-    tag: sx(["entity.name.tag"], a[6]!),
     error: p.error,
     warn: p.warning,
     info: a[6]!,
@@ -40,10 +49,104 @@ export function toNvim(theme: VscodeTheme): string {
     change: p.accent,
     del: p.error,
   };
+
+  // SYNTAX/TREESITTER table — every row pulls color+style from tokenColors.
+  const SYN: Row[] = [
+    // comments
+    ["@comment", ["comment"], a[5]!],
+    ["@comment.documentation", ["comment.block.documentation", "comment"], a[5]!],
+    // literals
+    ["@string", ["string.quoted", "string"], a[2]!],
+    ["@string.documentation", ["string.quoted.docstring", "string"], a[2]!],
+    ["@string.regexp", ["string.regexp"], a[2]!],
+    ["@string.escape", ["constant.character.escape"], a[1]!],
+    ["@string.special", ["string.other.link", "string"], a[2]!],
+    ["@character", ["constant.character", "string"], a[2]!],
+    ["@character.special", ["constant.character.escape"], a[1]!],
+    ["@number", ["constant.numeric"], a[1]!],
+    ["@number.float", ["constant.numeric.float", "constant.numeric"], a[1]!],
+    ["@boolean", ["constant.language.boolean", "constant.language"], a[1]!],
+    ["@constant", ["constant.other", "constant"], a[1]!],
+    ["@constant.builtin", ["constant.language", "support.constant"], a[1]!],
+    ["@constant.macro", ["entity.name.constant", "constant"], a[1]!],
+    // functions / methods
+    ["@function", ["entity.name.function", "meta.function-call", "support.function"], p.accent],
+    ["@function.call", ["meta.function-call", "entity.name.function"], p.accent],
+    ["@function.builtin", ["support.function"], p.accent],
+    ["@function.method", ["entity.name.function.member", "entity.name.function"], p.accent],
+    ["@function.method.call", ["entity.name.function.member", "entity.name.function"], p.accent],
+    ["@function.macro", ["entity.name.function.macro", "entity.name.function"], p.accent],
+    ["@constructor", ["entity.name.type.class", "entity.name.type", "entity.name.function"], p.fgMuted],
+    // keywords
+    ["@keyword", ["keyword.control", "keyword"], a[3]!],
+    ["@keyword.function", ["storage.type.function", "storage.type", "keyword.control"], a[3]!],
+    ["@keyword.operator", ["keyword.operator.expression", "keyword.operator", "keyword"], a[3]!],
+    ["@keyword.import", ["keyword.control.import", "keyword.control"], a[3]!],
+    ["@keyword.return", ["keyword.control.flow", "keyword.control"], a[3]!],
+    ["@keyword.conditional", ["keyword.control.conditional", "keyword.control"], a[3]!],
+    ["@keyword.repeat", ["keyword.control.loop", "keyword.control"], a[3]!],
+    ["@keyword.exception", ["keyword.control.exception", "keyword.control"], a[3]!],
+    ["@keyword.coroutine", ["keyword.control", "keyword"], a[3]!],
+    ["@keyword.type", ["storage.type", "keyword"], a[3]!],
+    ["@keyword.modifier", ["storage.modifier", "storage.type"], a[3]!],
+    ["@keyword.directive", ["keyword.control.directive", "keyword.other", "keyword"], a[3]!],
+    // types
+    ["@type", ["entity.name.type", "support.type", "entity.name.class", "support.class"], p.fgMuted],
+    ["@type.builtin", ["support.type.primitive", "support.type.builtin", "support.type"], p.fgMuted],
+    ["@type.definition", ["entity.name.type", "support.type"], p.fgMuted],
+    ["@attribute", ["entity.other.attribute-name"], p.accent],
+    // variables / properties
+    ["@variable", ["variable.other.readwrite", "variable.other", "variable"], p.fg],
+    ["@variable.builtin", ["variable.language", "variable.language.this", "support.variable"], a[6]!],
+    ["@variable.parameter", ["variable.parameter"], p.fg],
+    // member access (obj.x) vs object-literal keys ({x: ...}) often differ in
+    // VSCode themes (SoP: gold vs cyan); treesitter splits them, so mirror that.
+    ["@variable.member", ["variable.other.property", "support.type.property-name", "meta.object-literal.key"], a[6]!],
+    ["@property", ["meta.object-literal.key", "support.type.property-name", "variable.other.property"], a[6]!],
+    ["@field", ["meta.object-literal.key", "support.type.property-name", "variable.other.property"], a[6]!],
+    ["@module", ["entity.name.namespace", "entity.name.type.module", "support.other.namespace"], p.fgMuted],
+    ["@label", ["entity.name.label", "constant.other.label"], p.accent],
+    // operators / punctuation
+    ["@operator", ["keyword.operator"], a[3]!],
+    ["@punctuation.delimiter", ["punctuation.separator", "punctuation.terminator"], p.fg],
+    ["@punctuation.bracket", ["punctuation.definition", "meta.brace"], p.fg],
+    ["@punctuation.special", ["punctuation.definition.template-expression", "keyword.other"], a[3]!],
+    // markup tags (html/jsx/vue)
+    ["@tag", ["entity.name.tag"], a[6]!],
+    ["@tag.builtin", ["entity.name.tag"], a[6]!],
+    ["@tag.attribute", ["entity.other.attribute-name"], p.accent],
+    ["@tag.delimiter", ["punctuation.definition.tag"], p.fg],
+  ];
+
+  // Legacy vim syntax groups (non-treesitter buffers) link to the captures above
+  // so they stay consistent without a second resolution pass.
+  const LINKS: [string, string][] = [
+    ["Comment", "@comment"], ["String", "@string"], ["Character", "@character"],
+    ["Number", "@number"], ["Float", "@number.float"], ["Boolean", "@boolean"],
+    ["Constant", "@constant"], ["Keyword", "@keyword"], ["Statement", "@keyword"],
+    ["Conditional", "@keyword.conditional"], ["Repeat", "@keyword.repeat"],
+    ["Exception", "@keyword.exception"], ["Operator", "@operator"],
+    ["Function", "@function"], ["Identifier", "@variable"], ["Type", "@type"],
+    ["StorageClass", "@keyword.modifier"], ["Structure", "@type"],
+    ["PreProc", "@keyword.directive"], ["Include", "@keyword.import"],
+    ["Special", "@string.escape"], ["Delimiter", "@punctuation.delimiter"],
+    ["Tag", "@tag"], ["Title", "@function"],
+  ];
+
+  const luaStyle = (s: TokenStyle, fg = s.fg) => {
+    const parts = [`fg = "${fg}"`];
+    if (s.italic) parts.push("italic = true");
+    if (s.bold) parts.push("bold = true");
+    if (s.underline) parts.push("underline = true");
+    if (s.strikethrough) parts.push("strikethrough = true");
+    return parts.join(", ");
+  };
   const hl = (group: string, opts: Record<string, string | boolean>) => {
     const parts = Object.entries(opts).map(([k, v]) => `${k} = ${typeof v === "string" ? `"${v}"` : v}`);
     return `  hl("${group}", { ${parts.join(", ")} })`;
   };
+  const synLines = SYN.map(([g, scopes, fb]) => `  hl("${g}", { ${luaStyle(rt(scopes, fb))} })`).join("\n");
+  const linkLines = LINKS.map(([g, to]) => `  hl("${g}", { link = "${to}" })`).join("\n");
   const term = a.map((hex, i) => `vim.g.terminal_color_${i} = "${hex}"`).join("\n");
 
   return `-- ${theme.name} — generated by theme engine. Do not edit; run \`theme set <name>\`.
@@ -55,7 +158,7 @@ ${term}
 
 local hl = function(group, opts) vim.api.nvim_set_hl(0, group, opts) end
 
--- Editor
+-- Editor chrome
 ${hl("Normal", { bg: c.bg, fg: c.fg })}
 ${hl("NormalNC", { bg: c.bg, fg: c.fg })}
 ${hl("NormalFloat", { bg: c.panel, fg: c.fg })}
@@ -71,58 +174,11 @@ ${hl("ColorColumn", { bg: c.cursorLine })}
 ${hl("WinSeparator", { fg: c.panel, bg: c.bg })}
 ${hl("VertSplit", { fg: c.panel, bg: c.bg })}
 
--- Syntax
-${hl("Comment", { fg: c.comment, italic: true })}
-${hl("String", { fg: c.string })}
-${hl("Character", { fg: c.string })}
-${hl("Number", { fg: c.number })}
-${hl("Float", { fg: c.number })}
-${hl("Boolean", { fg: c.number })}
-${hl("Keyword", { fg: c.keyword, italic: true })}
-${hl("Statement", { fg: c.keyword })}
-${hl("Conditional", { fg: c.keyword, italic: true })}
-${hl("Repeat", { fg: c.keyword, italic: true })}
-${hl("Function", { fg: c.func })}
-${hl("Identifier", { fg: c.fg })}
-${hl("Type", { fg: c.type })}
-${hl("Constant", { fg: c.number })}
-${hl("Operator", { fg: c.keyword })}
-${hl("PreProc", { fg: c.keyword })}
-${hl("Special", { fg: c.keyword })}
-${hl("Delimiter", { fg: c.fg })}
+-- Treesitter / syntax (resolved from tokenColors — VSCode parity)
+${synLines}
 
--- Treesitter
-${hl("@comment", { link: "Comment" })}
-${hl("@string", { fg: c.string })}
-${hl("@number", { fg: c.number })}
-${hl("@boolean", { fg: c.number })}
-${hl("@function", { fg: c.func })}
-${hl("@function.call", { fg: c.func })}
-${hl("@function.builtin", { fg: c.func })}
-${hl("@method", { fg: c.func })}
-${hl("@keyword", { fg: c.keyword, italic: true })}
-${hl("@keyword.return", { fg: c.keyword, italic: true })}
-${hl("@keyword.function", { fg: c.keyword, italic: true })}
-${hl("@keyword.operator", { fg: c.keyword })}
-${hl("@keyword.import", { fg: c.keyword, italic: true })}
-${hl("@conditional", { fg: c.keyword, italic: true })}
-${hl("@variable", { fg: c.fg })}
-${hl("@variable.builtin", { fg: c.cyan, italic: true })}
-${hl("@variable.parameter", { fg: c.fg })}
-${hl("@property", { fg: c.cyan })}
-${hl("@field", { fg: c.cyan })}
-${hl("@type", { fg: c.type })}
-${hl("@type.builtin", { fg: c.type, italic: true })}
-${hl("@constructor", { fg: c.type })}
-${hl("@constant", { fg: c.number })}
-${hl("@constant.builtin", { fg: c.number })}
-${hl("@operator", { fg: c.keyword })}
-${hl("@punctuation", { fg: c.fg })}
-${hl("@punctuation.bracket", { fg: c.fg })}
-${hl("@punctuation.delimiter", { fg: c.fg })}
-${hl("@tag", { fg: c.tag })}
-${hl("@tag.attribute", { fg: c.accent, italic: true })}
-${hl("@tag.delimiter", { fg: c.fg })}
+-- Legacy syntax groups link to the resolved captures
+${linkLines}
 
 -- UI
 ${hl("Pmenu", { bg: c.panel, fg: c.muted })}
@@ -132,8 +188,8 @@ ${hl("StatusLine", { bg: c.panel, fg: c.muted })}
 ${hl("StatusLineNC", { bg: c.panel, fg: c.lineNr })}
 ${hl("TabLineSel", { bg: c.bg, fg: c.fg })}
 ${hl("Search", { bg: c.accent, fg: c.panel })}
-${hl("IncSearch", { bg: c.keyword, fg: c.panel })}
-${hl("CurSearch", { bg: c.number, fg: c.panel })}
+${hl("IncSearch", { bg: scopeColor(t, "keyword") ?? c.warn, fg: c.panel })}
+${hl("CurSearch", { bg: c.del, fg: c.panel })}
 ${hl("DiagnosticError", { fg: c.error })}
 ${hl("DiagnosticWarn", { fg: c.warn })}
 ${hl("DiagnosticInfo", { fg: c.info })}
@@ -158,7 +214,7 @@ ${hl("NeoTreeCursorLine", { bg: c.cursorLine })}
 -- Telescope
 ${hl("TelescopeNormal", { bg: c.panel, fg: c.fg })}
 ${hl("TelescopeBorder", { bg: c.panel, fg: c.indent })}
-${hl("TelescopePromptTitle", { bg: c.keyword, fg: c.panel, bold: true })}
+${hl("TelescopePromptTitle", { bg: c.accent, fg: c.panel, bold: true })}
 ${hl("TelescopePreviewTitle", { bg: c.add, fg: c.panel, bold: true })}
 ${hl("TelescopeResultsTitle", { bg: c.muted, fg: c.panel, bold: true })}
 ${hl("TelescopeSelection", { bg: c.visual, fg: c.fg })}
@@ -166,8 +222,8 @@ ${hl("TelescopeMatching", { fg: c.accent, bold: true })}
 
 -- Which-key
 ${hl("WhichKey", { fg: c.accent })}
-${hl("WhichKeyGroup", { fg: c.keyword })}
-${hl("WhichKeyDesc", { fg: c.muted })}
+${hl("WhichKeyGroup", { fg: c.muted })}
+${hl("WhichKeyDesc", { fg: c.fg })}
 ${hl("WhichKeyFloat", { bg: c.panel })}
 `;
 }
