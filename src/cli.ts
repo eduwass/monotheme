@@ -27,6 +27,13 @@ function applyTheme(slug: string, opSilent = false): void {
 
   for (const t of TARGETS) {
     if (t.mode === "manual") { if (!opSilent) console.log(`  - ${t.name} (manual, skipped)`); continue; }
+    if (t.apply) {
+      let status: string;
+      try { status = t.apply({ theme, entry }); } catch (e) { status = `${t.name} (error: ${(e as Error).message})`; }
+      if (!opSilent) console.log(`  ✓ ${status}`);
+      continue;
+    }
+    if (!t.dest || !t.render) continue;
     const dest = t.dest(theme);
     mkdirSync(dirname(dest), { recursive: true });
     writeFileSync(dest, t.render(theme));

@@ -33,7 +33,7 @@ export const ANSI_KEYS = [
 ];
 
 /** Find the foreground a scope resolves to (first matching tokenColor rule). */
-function scopeColor(tokens: TokenColor[], scope: string): string | undefined {
+export function scopeColor(tokens: TokenColor[], scope: string): string | undefined {
   for (const t of tokens) {
     const scopes = Array.isArray(t.scope) ? t.scope : t.scope ? [t.scope] : [];
     if (scopes.some((s) => s.split(",").map((x) => x.trim()).includes(scope))) {

@@ -2,23 +2,51 @@
 // reload it. Keeping this isolated keeps the engine itself OSS-portable.
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import type { VscodeTheme } from "./load.ts";
+import type { ThemeEntry } from "./discover.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
 import { toGhostty } from "./adapters/ghostty.ts";
 import { toTmux } from "./adapters/tmux.ts";
 import { toBtop } from "./adapters/btop.ts";
+import { toZed, ZED_THEME_NAME } from "./adapters/zed.ts";
+import { patchJsonStringKey } from "./util.ts";
 
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
+
+export interface TargetCtx {
+  theme: VscodeTheme;
+  entry: ThemeEntry;
+}
 
 export interface Target {
   name: string;
   mode: "generated" | "manual" | "selector";
-  /** absolute destination path for this theme */
-  dest: (theme: VscodeTheme) => string;
-  /** produce the file contents */
-  render: (theme: VscodeTheme) => string;
-  /** shell command run after writing (best-effort live reload); {} no-ops if tool absent */
+  /** file targets: write render(theme) to dest(theme), then reload. */
+  dest?: (theme: VscodeTheme) => string;
+  render?: (theme: VscodeTheme) => string;
   reload?: (theme: VscodeTheme) => string;
+  /** custom targets (editors): do their own work; return a status line. */
+  apply?: (ctx: TargetCtx) => string;
+}
+
+const MAC_APP_SUPPORT = join(homedir(), "Library", "Application Support");
+function editorSelector(name: string, appDir: string): Target {
+  // Set the editor's own colorTheme to the resolved theme's label (the theme is
+  // already installed there, since discovery found it in that editor).
+  return {
+    name,
+    mode: "selector",
+    apply: ({ entry }) => {
+      // Only a real editor theme has a label the editor's colorTheme will accept;
+      // the local fallback's label is just a slug, so skip it.
+      if (entry.source === "local") return `${name} (skipped — local theme has no editor label)`;
+      const settings = join(MAC_APP_SUPPORT, appDir, "User", "settings.json");
+      return patchJsonStringKey(settings, "workbench.colorTheme", entry.label)
+        ? `${name} → colorTheme = ${entry.label}`
+        : `${name} (not installed)`;
+    },
+  };
 }
 
 // A fixed "slot" each tool's selector points at permanently, so switching themes
@@ -66,5 +94,21 @@ export const TARGETS: Target[] = [
     render: toBtop,
     // SIGUSR2 reloads btop's config/theme; no-op if not running.
     reload: () => "pkill -USR2 -x btop 2>/dev/null || true",
+  },
+  // Editors as sinks (set their own colorTheme). Mac-only paths; no-op elsewhere.
+  editorSelector("cursor", "Cursor"),
+  editorSelector("vscode", "Code"),
+  {
+    name: "zed",
+    mode: "generated",
+    // Zed's theme names won't match arbitrary VSCode labels, so generate a Zed
+    // theme into a stable "Dotfiles" slot; Zed watches the dir and hot-reloads.
+    apply: ({ theme }) => {
+      const dir = join(homedir(), ".config", "zed", "themes");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "dotfiles.json"), toZed(theme));
+      const ok = patchJsonStringKey(join(homedir(), ".config", "zed", "settings.json"), "theme", ZED_THEME_NAME);
+      return ok ? `zed → themes/dotfiles.json (theme = ${ZED_THEME_NAME})` : "zed (no settings.json)";
+    },
   },
 ];

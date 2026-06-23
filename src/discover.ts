@@ -34,19 +34,9 @@ export function discover(): ThemeEntry[] {
     if (!seen.has(e.slug)) { seen.add(e.slug); out.push(e); }
   };
 
-  // 1) local repo themes (always available, incl. on machines without editors)
-  if (existsSync(LOCAL_THEMES)) {
-    for (const f of readdirSync(LOCAL_THEMES)) {
-      if (!f.endsWith(".json")) continue;
-      const path = join(LOCAL_THEMES, f);
-      let appearance: "dark" | "light" = "dark";
-      try { appearance = (JSON5.parse(readFileSync(path, "utf8")).type as "dark" | "light") ?? "dark"; } catch {}
-      const label = f.replace(/\.json$/, "");
-      add({ label, slug: slugify(label), appearance, path, source: "local" });
-    }
-  }
-
-  // 2) installed editor extensions -> contributes.themes
+  // 1) installed editor extensions -> contributes.themes (authoritative: the
+  //    label here is what the editor's `colorTheme` selector expects). These win
+  //    over local copies on slug collision so editor selectors get a valid label.
   for (const root of EXT_ROOTS) {
     if (!existsSync(root)) continue;
     for (const ext of readdirSync(root)) {
@@ -64,6 +54,19 @@ export function discover(): ThemeEntry[] {
         const appearance: "dark" | "light" = th.uiTheme === "vs" ? "light" : "dark";
         add({ label, slug: slugify(label), appearance, path, source: ext });
       }
+    }
+  }
+
+  // 2) local repo themes — fallback for slugs no editor provides (and for
+  //    machines without editors installed, e.g. devbox).
+  if (existsSync(LOCAL_THEMES)) {
+    for (const f of readdirSync(LOCAL_THEMES)) {
+      if (!f.endsWith(".json")) continue;
+      const path = join(LOCAL_THEMES, f);
+      let appearance: "dark" | "light" = "dark";
+      try { appearance = (JSON5.parse(readFileSync(path, "utf8")).type as "dark" | "light") ?? "dark"; } catch {}
+      const label = f.replace(/\.json$/, "");
+      add({ label, slug: slugify(label), appearance, path, source: "local" });
     }
   }
 

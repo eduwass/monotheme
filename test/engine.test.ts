@@ -90,6 +90,34 @@ test("ghostty: 16 ordered palette lines + bg/fg/cursor from projection", () => {
   expect(out).toContain("selection-background =");
 });
 
+test("zed: valid theme family with style + syntax + ansi", () => {
+  const { toZed } = require("../src/adapters/zed.ts");
+  const z = JSON.parse(toZed(sop));
+  expect(z.name).toBe("Dotfiles");
+  expect(z.themes[0].name).toBe("Dotfiles");
+  expect(z.themes[0].appearance).toBe("dark");
+  expect(z.themes[0].style.background).toBe("#2D2B55");
+  expect(z.themes[0].style["terminal.ansi.red"]).toBe("#EC3A37");
+  expect(z.themes[0].style.syntax.comment.color).toBeTruthy();
+  expect(z.themes[0].style["text.accent"]).toBe("#FAD000");
+});
+
+test("patchJsonStringKey: replaces existing key, inserts missing, preserves rest", () => {
+  const { patchJsonStringKey } = require("../src/util.ts");
+  const { writeFileSync, readFileSync, mkdtempSync } = require("node:fs");
+  const { join } = require("node:path");
+  const { tmpdir } = require("node:os");
+  const f = join(mkdtempSync(join(tmpdir(), "theme-")), "settings.json");
+  writeFileSync(f, '{\n  // keep me\n  "workbench.colorTheme": "Old",\n  "other": 1\n}\n');
+  patchJsonStringKey(f, "workbench.colorTheme", "New Theme");
+  let s = readFileSync(f, "utf8");
+  expect(s).toContain('"workbench.colorTheme": "New Theme"');
+  expect(s).toContain("// keep me");        // comment preserved
+  expect(s).toContain('"other": 1');         // other keys preserved
+  patchJsonStringKey(f, "theme", "Dotfiles"); // insert missing
+  expect(readFileSync(f, "utf8")).toContain('"theme": "Dotfiles"');
+});
+
 test("slugify + discover: labels normalize, local themes are found", () => {
   expect(slugify("GitHub Dark Default")).toBe("github-dark-default");
   expect(slugify("  Shades of Purple  ")).toBe("shades-of-purple");
