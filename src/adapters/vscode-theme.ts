@@ -3,14 +3,31 @@
 // Feeding nvim-textmate OUR slot (instead of pointing it at raw editor extensions)
 // avoids per-theme quirks: multi-variant naming ("GitHub Light" vs "GitHub Light
 // Default"), include resolution, etc. We control one stable name.
-import type { VscodeTheme } from "../load.ts";
+import type { VscodeTheme, TokenColor } from "../load.ts";
+import { stripAlpha } from "../load.ts";
 
 export const NVIM_TM_THEME = "Dotfiles";
+
+// nvim-textmate's C color parser wants #rrggbb — normalize #rgb shorthand / alpha
+// (raw editor themes like github-light use "#fff", which renders as black).
+const norm = (v: unknown) => (typeof v === "string" && /^#[0-9a-fA-F]{3,8}$/.test(v) ? stripAlpha(v) : v);
+function normColors(c: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k in c) out[k] = norm(c[k]) as string;
+  return out;
+}
+function normTokens(tokens: TokenColor[]): TokenColor[] {
+  return tokens.map((t) =>
+    t.settings
+      ? { ...t, settings: { ...t.settings, ...(t.settings.foreground ? { foreground: norm(t.settings.foreground) as string } : {}), ...(t.settings.background ? { background: norm(t.settings.background) as string } : {}) } }
+      : t,
+  );
+}
 
 /** The VSCode theme JSON (colors + tokenColors) under the stable name. */
 export function toVscodeTheme(theme: VscodeTheme): string {
   return JSON.stringify(
-    { name: NVIM_TM_THEME, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors },
+    { name: NVIM_TM_THEME, type: theme.type, colors: normColors(theme.colors), tokenColors: normTokens(theme.tokenColors) },
     null,
     2,
   ) + "\n";
