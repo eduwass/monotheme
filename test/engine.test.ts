@@ -33,6 +33,16 @@ test("ANSI: SoP maps all 16 slots from terminal.ansi* (alpha stripped)", () => {
   expect(p.warnings).toHaveLength(0); // SoP defines ANSI -> no inference
 });
 
+test("projection: SoP semantic roles resolve to the right brand colors", () => {
+  const p = project(sop);
+  expect(p.accent).toBe("#FAD000"); // gold from button.background (not focusBorder dark)
+  expect(p.fgMuted).toBe("#A599E9"); // lavender
+  expect(p.bg).toBe("#2D2B55");
+  // accent must never collapse to a near-background dark color
+  expect(p.accent).not.toBe(p.bg);
+  expect(p.borderActive).not.toBe(p.bg);
+});
+
 test("ANSI: GitHub Dark maps to its exact authored values", () => {
   const p = project(gh);
   expect(p.bg).toBe("#0d1117");

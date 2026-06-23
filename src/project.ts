@@ -70,14 +70,24 @@ export function project(theme: VscodeTheme): Projection {
             blk, red, green, yellow, blue, magenta, cyan, wht];
   }
 
+  // The theme's primary brand/highlight color. button.background &
+  // activityBarBadge.background carry it reliably; focusBorder is a last resort
+  // (it's a dark border in some themes, e.g. Shades of Purple).
+  const accent = pick(c, [
+    "button.background", "activityBarBadge.background", "badge.background",
+    "progressBar.background", "textLink.activeForeground", "focusBorder",
+  ]) ?? ansi[3]!;
+  // A subtle chrome border — avoid panel.border (often the accent color).
+  const border = pick(c, ["editorGroup.border", "sideBar.border", "editorWidget.border", "input.border"]) ?? ansi[8]!;
+
   return {
     bg,
-    bgPanel: pick(c, ["editorGroupHeader.tabsBackground", "sideBar.background", "editorWidget.background"]) ?? bg,
+    bgPanel: pick(c, ["sideBar.background", "editorWidget.background", "panel.background", "editorGroupHeader.tabsBackground"]) ?? bg,
     fg,
     fgMuted: pick(c, ["descriptionForeground", "editorLineNumber.foreground", "tab.inactiveForeground"]) ?? fg,
-    accent: pick(c, ["focusBorder", "progressBar.background", "button.background", "textLink.foreground"]) ?? ansi[3]!,
-    border: pick(c, ["editorGroup.border", "panel.border", "widget.border"]) ?? ansi[8]!,
-    borderActive: pick(c, ["focusBorder", "tab.activeBorderTop", "progressBar.background"]) ?? ansi[3]!,
+    accent,
+    border,
+    borderActive: pick(c, ["tab.activeBorder", "focusBorder"]) ?? accent,
     selection: pick(c, ["editor.selectionBackground", "terminal.selectionBackground"]) ?? ansi[8]!,
     cursor: pick(c, ["editorCursor.foreground", "terminalCursor.foreground", "editor.foreground"]) ?? fg,
     success: pick(c, ["editorGutter.addedBackground", "gitDecoration.addedResourceForeground"]) ?? ansi[2]!,

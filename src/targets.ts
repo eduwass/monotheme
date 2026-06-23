@@ -5,6 +5,8 @@ import { join, resolve, dirname } from "node:path";
 import type { VscodeTheme } from "./load.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
 import { toGhostty } from "./adapters/ghostty.ts";
+import { toTmux } from "./adapters/tmux.ts";
+import { toBtop } from "./adapters/btop.ts";
 
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
 
@@ -46,5 +48,23 @@ export const TARGETS: Target[] = [
       process.platform === "darwin"
         ? `osascript -e 'tell application "Ghostty" to perform action "reload_config" on terminal 1' >/dev/null 2>&1 || true`
         : "pkill -USR2 -x ghostty 2>/dev/null || true",
+  },
+  {
+    name: "tmux",
+    mode: "generated",
+    // .tmux.conf sources this file; we (re)define the @color-* vars in it.
+    dest: () => join(homedir(), ".config", "tmux", "theme.conf"),
+    render: toTmux,
+    // re-source live into every running tmux server (no-op if none).
+    reload: () => `tmux source-file "$HOME/.config/tmux/theme.conf" 2>/dev/null || true`,
+  },
+  {
+    name: "btop",
+    mode: "generated",
+    // btop.conf pins color_theme = "dotfiles"; we overwrite that slot.
+    dest: () => join(homedir(), ".config", "btop", "themes", "dotfiles.theme"),
+    render: toBtop,
+    // SIGUSR2 reloads btop's config/theme; no-op if not running.
+    reload: () => "pkill -USR2 -x btop 2>/dev/null || true",
   },
 ];
