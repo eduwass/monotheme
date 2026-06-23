@@ -211,19 +211,32 @@ export const TARGETS: Target[] = [
     name: "nvim",
     mode: "generated",
     detect: hasCmd("nvim"),
-    // No per-theme nvim plugin is installed (only built-ins + shades_of_purple), so
-    // generate a complete colorscheme into the `colors/dotfiles.lua` slot. nvim's
-    // colorscheme.lua pins `colorscheme = "dotfiles"`; ~/.config/nvim is symlinked
-    // into the repo, so write the slot at the repo path (gitignored).
-    dest: () => join(REPO, ".config", "nvim", "colors", "dotfiles.lua"),
-    render: toNvim,
-    // Re-source the colorscheme live in every running nvim (best-effort over its
-    // listen sockets); no-op when none are running. nvim's default socket lives
-    // under $XDG_RUNTIME_DIR on Linux but under $TMPDIR/nvim.<user>/<rand>/ on
-    // macOS (XDG_RUNTIME_DIR is unset there), so glob both layouts. /bin/sh leaves
-    // unmatched globs literal, and the `[ -S ]` test filters those out.
-    reload: () =>
-      `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>' 2>/dev/null; done; true`,
+    // Two layers: (1) a generated colorscheme `colors/dotfiles.lua` for editor
+    // CHROME (bg, line numbers, panels) — selected via `colorscheme = "dotfiles"`;
+    // (2) SYNTAX comes from nvim-textmate, which tokenizes with the same TextMate
+    // grammars + theme file as Cursor/shiki (true parity). We hand it the active
+    // theme's editor label; it loads the identical file from ~/.cursor/extensions.
+    // ~/.config/nvim is symlinked into the repo, so both slots live at REPO paths.
+    apply: ({ theme, entry }) => {
+      const colors = join(REPO, ".config", "nvim", "colors", "dotfiles.lua");
+      mkdirSync(dirname(colors), { recursive: true });
+      writeFileSync(colors, toNvim(theme));
+      // nvim-textmate needs an installed editor-extension theme (matched by label);
+      // a local fallback theme has no such label, so skip the textmate layer there.
+      const label = entry.source === "local" ? "" : entry.label;
+      const nameFile = join(REPO, ".config", "nvim", "textmate_theme.txt");
+      writeFileSync(nameFile, label + "\n");
+      // Live-reload running nvims over their listen sockets (default socket is
+      // under $XDG_RUNTIME_DIR on Linux, $TMPDIR/nvim.<user>/<rand>/ on macOS).
+      // Reapply chrome (:colorscheme) + syntax (:TxMtTheme <label>). /bin/sh leaves
+      // unmatched globs literal; the `[ -S ]` test filters them out.
+      const tx = label ? `:TxMtTheme ${label}<CR>` : "";
+      execSync(
+        `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>${tx}' 2>/dev/null; done; true`,
+        { stdio: "ignore" },
+      );
+      return `nvim → colors/dotfiles.lua (chrome) + textmate ${label || "(local — treesitter only)"}`;
+    },
   },
   {
     name: "lazygit",
