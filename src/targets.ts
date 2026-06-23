@@ -18,6 +18,7 @@ import { toShiki } from "./adapters/shiki.ts";
 import { toHerdrTheme } from "./adapters/herdr.ts";
 import { toFzf } from "./adapters/fzf.ts";
 import { toNvim } from "./adapters/nvim.ts";
+import { toLazygit } from "./adapters/lazygit.ts";
 import { nearestAccent } from "./adapters/macos-accent.ts";
 import { patchJsonStringKey } from "./util.ts";
 
@@ -220,6 +221,24 @@ export const TARGETS: Target[] = [
     // listen sockets); no-op when none are running.
     reload: () =>
       `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>' 2>/dev/null; done; true`,
+  },
+  {
+    name: "lazygit",
+    mode: "generated",
+    detect: hasConfig("lazygit", "config.yml"),
+    // config.yml isn't symlinked into the repo; rewrite the contiguous gui.theme
+    // block in place (preserving git.pagers etc). lazygit reads config on launch,
+    // so it applies next start — no live reload.
+    apply: ({ theme }) => {
+      const conf = cfg("lazygit", "config.yml");
+      let s = readFileSync(conf, "utf8");
+      const block = toLazygit(theme);
+      // match `  theme:` + all lines indented deeper than the gui-key level.
+      const re = /^ {2}theme:\n(?: {4}.*\n| *\n)*/m;
+      s = re.test(s) ? s.replace(re, block) : s.replace(/^gui:\n/m, `gui:\n${block}`);
+      writeFileSync(conf, s);
+      return "lazygit → gui.theme (relaunch to apply)";
+    },
   },
   {
     name: "macos-accent",

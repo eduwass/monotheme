@@ -155,6 +155,21 @@ test("nvim: generates a loadable colorscheme with bg/term colors from theme", ()
   expect(lua).toContain('local hl = function(group, opts)');
 });
 
+test("lazygit: theme block maps roles + in-place replace preserves git.pagers", () => {
+  const { toLazygit } = require("../src/adapters/lazygit.ts");
+  const block = toLazygit(sop);
+  expect(block).toContain('activeBorderColor:');
+  expect(block).toContain(`- "${project(sop).accent}"`); // gold active border
+  expect(block).toContain('- bold');
+  // the same regex the target uses must swap the block without eating git.pagers
+  const orig = "gui:\n  nerdFontsVersion: \"3\"\n  theme:\n    activeBorderColor:\n      - \"#000\"\n      - bold\ngit:\n  pagers:\n    - pager: x\n";
+  const re = /^ {2}theme:\n(?: {4}.*\n| *\n)*/m;
+  const out = orig.replace(re, block);
+  expect(out).toContain("git:\n  pagers:");
+  expect(out).toContain("nerdFontsVersion");
+  expect(out).not.toContain('- "#000"');
+});
+
 test("mix: blends two hex colors for readable muted ladders", () => {
   const { mix } = require("../src/load.ts");
   expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
