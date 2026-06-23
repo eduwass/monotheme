@@ -3,6 +3,7 @@
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import type { VscodeTheme } from "./load.ts";
 import type { ThemeEntry } from "./discover.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
@@ -15,6 +16,7 @@ import { toClaude, CLAUDE_THEME_NAME } from "./adapters/claude.ts";
 import { toYaziFlavor } from "./adapters/yazi.ts";
 import { toShiki } from "./adapters/shiki.ts";
 import { toHunkCustomTheme } from "./adapters/hunk.ts";
+import { toHerdrTheme } from "./adapters/herdr.ts";
 import { patchJsonStringKey } from "./util.ts";
 
 const cfg = (...p: string[]) => join(homedir(), ".config", ...p);
@@ -179,6 +181,21 @@ export const TARGETS: Target[] = [
       s = /\[custom_theme\]/.test(s) ? s.replace(/\[custom_theme\][\s\S]*$/, toHunkCustomTheme(theme)) : s + "\n" + toHunkCustomTheme(theme);
       writeFileSync(conf, s);
       return "hunk → [custom_theme] + dotfiles.json";
+    },
+  },
+  {
+    name: "herdr",
+    mode: "generated",
+    detect: hasConfig("herdr", "config.toml"),
+    apply: ({ theme }) => {
+      const conf = cfg("herdr", "config.toml");
+      let s = readFileSync(conf, "utf8");
+      // [theme.custom] is the trailing section; regenerate it.
+      s = /\[theme\.custom\]/.test(s) ? s.replace(/\[theme\.custom\][\s\S]*$/, toHerdrTheme(theme)) : s + "\n" + toHerdrTheme(theme);
+      writeFileSync(conf, s);
+      // config-only change: reload-config (NOT restart). No-op if no server.
+      try { execSync("herdr server reload-config", { stdio: "ignore" }); } catch {}
+      return "herdr → [theme.custom] (reload-config)";
     },
   },
 ];
