@@ -168,6 +168,19 @@ test("resolveToken: TextMate parity — color + fontStyle resolved independently
   expect(resolveToken(t, "totally.made.up.scope")).toBeUndefined();
 });
 
+test("resolveToken: scope segments colliding with Object.prototype don't break the trie", () => {
+  const { resolveToken } = require("../src/project.ts");
+  // "constructor"/"hasOwnProperty"/"__proto__" as scope segments must not hit
+  // inherited object members (regression: Tokyo Night / GitHub Light use them).
+  const toks = [
+    { scope: "entity.name.function.constructor", settings: { foreground: "#aabbcc" } },
+    { scope: "meta.hasOwnProperty.__proto__", settings: { foreground: "#112233" } },
+  ];
+  expect(() => resolveToken(toks, "entity.name.function.constructor.ts")).not.toThrow();
+  expect(resolveToken(toks, "entity.name.function.constructor.ts")?.fg).toBe("#aabbcc");
+  expect(resolveToken(toks, "meta.hasOwnProperty.__proto__")?.fg).toBe("#112233");
+});
+
 test("nvim: colorscheme carries resolved syntax (VSCode parity) + chrome + term", () => {
   const { toNvim } = require("../src/adapters/nvim.ts");
   const lua = toNvim(sop);

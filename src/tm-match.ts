@@ -108,7 +108,9 @@ class TrieElement {
   constructor(
     private mainRule: TrieRule,
     private rulesWithParentScopes: TrieRule[] = [],
-    private children: Record<string, TrieElement> = {},
+    // null-prototype: scope segments like "constructor"/"hasOwnProperty" must not
+    // collide with Object.prototype keys (else lookups return inherited members).
+    private children: Record<string, TrieElement> = Object.create(null),
   ) {}
 
   private static cmp(a: TrieRule, b: TrieRule): number {
