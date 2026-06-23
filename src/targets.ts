@@ -164,7 +164,19 @@ export const TARGETS: Target[] = [
       mkdirSync(dir, { recursive: true });
       writeFileSync(join(dir, "dotfiles.json"), toOpencode(theme));
       patchJsonStringKey(join(root, "tui.json"), "theme", "dotfiles");
-      return "opencode → themes/dotfiles.json (restart to apply)";
+      // opencode hot-reloads its theme on SIGUSR2 (shipped but undocumented; the
+      // file-watcher PR #4879 was never merged, so a bare write does nothing).
+      // Signal only the TUI processes — `opencode serve` has NO SIGUSR2 handler,
+      // so the signal's default disposition KILLS it. So: match by executable name
+      // (pgrep -x, portable Mac+Linux), then exclude any whose args contain
+      // `serve`. No-op when none running.
+      try {
+        execSync(
+          `for p in $(pgrep -x opencode 2>/dev/null); do case "$(ps -o args= -p $p 2>/dev/null)" in *serve*) ;; *) kill -USR2 $p 2>/dev/null ;; esac; done; true`,
+          { stdio: "ignore" },
+        );
+      } catch {}
+      return "opencode → themes/dotfiles.json (SIGUSR2 live-reload)";
     },
   },
   {
