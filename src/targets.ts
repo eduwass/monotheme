@@ -236,13 +236,15 @@ export const TARGETS: Target[] = [
       writeFileSync(join(extDir, "current.txt"), label + "\n");
       // Live-reload running nvims over their listen sockets (default socket is
       // under $XDG_RUNTIME_DIR on Linux, $TMPDIR/nvim.<user>/<rand>/ on macOS).
-      // Reapply chrome (:colorscheme) + switch nvim-textmate to the new per-theme
-      // label (:TxMtTheme): the unique name cache-busts its by-name theme cache so
-      // a dark↔light switch re-reads our rewritten slot. silent! no-ops where the
-      // plugin isn't loaded yet (E492). Label has spaces → fine inside the
-      // single-quoted remote-send string.
+      // Order matters: switch nvim-textmate FIRST (:TxMtTheme — the per-theme label
+      // cache-busts its by-name theme cache so dark↔light re-reads our slot; it also
+      // sets Normal bg from its own theme_info, which can lag), THEN reapply our
+      // chrome (:colorscheme dotfiles) LAST so our correct bg/panels win. The
+      // textmate syntax is extmark-based and survives the colorscheme reapply.
+      // silent! no-ops where the plugin isn't loaded yet (E492). Label has spaces →
+      // fine inside the single-quoted remote-send string.
       execSync(
-        `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:colorscheme dotfiles<CR>:silent! TxMtTheme ${label}<CR>' 2>/dev/null; done; true`,
+        `for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:silent! TxMtTheme ${label}<CR>:colorscheme dotfiles<CR>' 2>/dev/null; done; true`,
         { stdio: "ignore" },
       );
       return `nvim → colors/dotfiles.lua (chrome) + tm-extensions (${label})`;
