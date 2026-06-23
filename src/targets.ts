@@ -2,7 +2,7 @@
 // reload it. Keeping this isolated keeps the engine itself OSS-portable.
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync } from "node:fs";
 import type { VscodeTheme } from "./load.ts";
 import type { ThemeEntry } from "./discover.ts";
 import { toTmTheme } from "./adapters/tmtheme.ts";
@@ -10,6 +10,8 @@ import { toGhostty } from "./adapters/ghostty.ts";
 import { toTmux } from "./adapters/tmux.ts";
 import { toBtop } from "./adapters/btop.ts";
 import { toZed, ZED_THEME_NAME } from "./adapters/zed.ts";
+import { toOpencode } from "./adapters/opencode.ts";
+import { toClaude, CLAUDE_THEME_NAME } from "./adapters/claude.ts";
 import { patchJsonStringKey } from "./util.ts";
 
 const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
@@ -109,6 +111,32 @@ export const TARGETS: Target[] = [
       writeFileSync(join(dir, "dotfiles.json"), toZed(theme));
       const ok = patchJsonStringKey(join(homedir(), ".config", "zed", "settings.json"), "theme", ZED_THEME_NAME);
       return ok ? `zed → themes/dotfiles.json (theme = ${ZED_THEME_NAME})` : "zed (no settings.json)";
+    },
+  },
+  {
+    name: "opencode",
+    mode: "generated",
+    apply: ({ theme }) => {
+      const root = join(homedir(), ".config", "opencode");
+      if (!existsSync(root)) return "opencode (not installed)";
+      const dir = join(root, "themes");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "dotfiles.json"), toOpencode(theme));
+      patchJsonStringKey(join(root, "tui.json"), "theme", "dotfiles");
+      return "opencode → themes/dotfiles.json (restart to apply)";
+    },
+  },
+  {
+    name: "claude",
+    mode: "generated",
+    apply: ({ theme }) => {
+      const root = join(homedir(), ".claude");
+      if (!existsSync(root)) return "claude (not installed)";
+      const dir = join(root, "themes");
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, "dotfiles.json"), toClaude(theme));
+      patchJsonStringKey(join(root, "settings.json"), "theme", `custom:${CLAUDE_THEME_NAME.toLowerCase()}`);
+      return "claude → themes/dotfiles.json (restart to apply)";
     },
   },
 ];

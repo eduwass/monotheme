@@ -118,6 +118,26 @@ test("patchJsonStringKey: replaces existing key, inserts missing, preserves rest
   expect(readFileSync(f, "utf8")).toContain('"theme": "Dotfiles"');
 });
 
+test("opencode: full semantic schema, accent gold, syntax mapped", () => {
+  const { toOpencode } = require("../src/adapters/opencode.ts");
+  const o = JSON.parse(toOpencode(sop)).theme;
+  expect(o.accent.dark).toBe("#FAD000");
+  expect(o.background.dark).toBe("#2D2B55");
+  expect(o.syntaxComment.dark).toBeTruthy();
+  expect(o.syntaxKeyword.dark).toBeTruthy();
+  expect(o.diffAdded.dark).toBe(project(sop).success);
+});
+
+test("claude: name/base/overrides with gold accent + diff colors", () => {
+  const { toClaude } = require("../src/adapters/claude.ts");
+  const cl = JSON.parse(toClaude(sop));
+  expect(cl.base).toBe("dark");
+  expect(cl.overrides.claude).toBe("#FAD000");
+  expect(cl.overrides.text).toBe("#FFFFFF");
+  expect(cl.overrides.background).toBe("#2D2B55");
+  expect(cl.overrides.diffAdded).toBeTruthy();
+});
+
 test("slugify + discover: labels normalize, local themes are found", () => {
   expect(slugify("GitHub Dark Default")).toBe("github-dark-default");
   expect(slugify("  Shades of Purple  ")).toBe("shades-of-purple");
