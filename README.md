@@ -4,7 +4,7 @@
 
 https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c
 
-> got tired of hand-porting my theme to every single tool, so i made little theme engine
+> got tired of hand-porting my theme to every single tool, so i made little theme engine - [tweet](https://x.com/eduwass/status/2069421542027502066)
 
 # monotheme
 
