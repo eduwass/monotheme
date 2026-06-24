@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/monotheme-logo.png" alt="monotheme" width="40%">
+  <img src="assets/monotheme-logo.png?v=2" alt="monotheme" width="40%">
 </p>
 
 https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c
