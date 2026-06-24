@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>monotheme — one theme, every tool</title>
+<meta name="description" content="One source of truth (a VSCode/shiki theme) projected into every tool's native format, switched with one live-reloading command.">
+
+<!-- OpenGraph / social -->
+<meta property="og:title" content="monotheme — one theme, every tool">
+<meta property="og:description" content="One VSCode/shiki theme, projected into your terminal, editors, git UI, file manager and OS. One command, live reload.">
+<meta property="og:image" content="https://raw.githubusercontent.com/eduwass/monotheme/main/assets/monotheme-logo.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="assets/monotheme-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<!-- React Flow styles -->
+<link rel="stylesheet" href="https://esm.sh/@xyflow/react@12/dist/style.css">
+
+<style>
+  :root {
+    --bg:#1b1a3a; --bg2:#232150; --panel:#2d2b55; --line:#3a3568;
+    --fg:#ffffff; --muted:#a599e9; --accent:#fad000;
+    --cyan:#9effff; --green:#3ad900; --orange:#ff9d00; --pink:#fc199a; --purple:#b362ff;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-behavior:smooth; }
+  body {
+    margin:0; background:var(--bg); color:var(--fg);
+    font-family:'Inter',system-ui,sans-serif; line-height:1.6;
+    background-image:radial-gradient(900px 500px at 80% -10%, rgba(179,98,255,.18), transparent),
+                     radial-gradient(800px 500px at 0% 10%, rgba(158,255,255,.10), transparent);
+  }
+  a { color:var(--cyan); text-decoration:none; }
+  a:hover { text-decoration:underline; }
+  code, pre, .mono { font-family:'JetBrains Mono',ui-monospace,monospace; }
+  .wrap { max-width:1040px; margin:0 auto; padding:0 24px; }
+  section { padding:72px 0; }
+
+  /* buttons */
+  .btn {
+    display:inline-flex; align-items:center; gap:8px; padding:11px 18px; border-radius:10px;
+    font-weight:600; font-size:15px; border:1px solid transparent; cursor:pointer;
+  }
+  .btn.primary { background:var(--accent); color:#1b1a3a; }
+  .btn.primary:hover { filter:brightness(1.06); text-decoration:none; }
+  .btn.ghost { border-color:var(--line); color:var(--fg); }
+  .btn.ghost:hover { border-color:var(--muted); text-decoration:none; }
+
+  /* hero */
+  .hero { text-align:center; padding-top:64px; }
+  .hero img.logo { width:148px; height:148px; filter:drop-shadow(0 12px 40px rgba(250,208,0,.18)); }
+  .hero h1 { font-size:clamp(40px,7vw,76px); margin:18px 0 6px; letter-spacing:-.02em; }
+  .hero .tag { font-size:clamp(17px,2.5vw,22px); color:var(--muted); max-width:680px; margin:0 auto; }
+  .hero .cta { display:flex; gap:12px; justify-content:center; margin-top:28px; flex-wrap:wrap; }
+  .pill { display:inline-block; margin-top:22px; padding:6px 14px; border:1px solid var(--line);
+          border-radius:999px; color:var(--muted); font-size:13px; }
+  .pill b { color:var(--accent); }
+
+  h2 { font-size:clamp(26px,4vw,38px); letter-spacing:-.01em; margin:0 0 10px; }
+  h2 .num { color:var(--accent); font-family:'JetBrains Mono',monospace; font-size:.7em; margin-right:10px; }
+  .lead { color:var(--muted); max-width:720px; margin:0 0 28px; font-size:17px; }
+
+  /* video */
+  .video-card { border:1px solid var(--line); overflow:hidden;
+    background:#000; box-shadow:0 24px 80px rgba(0,0,0,.45); }
+  .video-card video { display:block; width:100%; height:auto; }
+
+  /* flow */
+  #flow { height:640px; width:100%; border:1px solid var(--line); border-radius:16px;
+    overflow:hidden; background:linear-gradient(180deg,#1d1c40,#191833); }
+  .legend { display:flex; flex-wrap:wrap; gap:14px 22px; margin-top:18px; }
+  .legend span { display:inline-flex; align-items:center; gap:8px; color:var(--muted); font-size:13px; }
+  .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; }
+
+  /* code blocks */
+  pre.code { background:#16152e; border:1px solid var(--line); border-radius:12px; padding:18px 20px;
+    overflow:auto; font-size:14px; color:#e7e3ff; }
+  pre.code .c { color:var(--muted); }       /* comment */
+  pre.code .k { color:var(--accent); }       /* command/keyword */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:760px){ .grid2 { grid-template-columns:1fr; } }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:22px; }
+  .card h3 { margin:0 0 8px; font-size:18px; display:flex; align-items:center; gap:9px; }
+  .card h3 i { width:11px; height:11px; border-radius:3px; display:inline-block; }
+  .card p { color:var(--muted); margin:0 0 14px; font-size:15px; }
+  .toolgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
+  @media (max-width:860px){ .toolgrid { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:560px){ .toolgrid { grid-template-columns:1fr; } }
+
+  /* tool chips */
+  .chips { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+  .chip { border:1px solid var(--line); background:rgba(45,43,85,.5); border-radius:999px;
+    padding:7px 14px; font-size:13px; color:#e7e3ff; font-family:'JetBrains Mono',monospace; }
+
+  footer { border-top:1px solid var(--line); padding:40px 0; color:var(--muted); font-size:14px; }
+  footer .wrap { display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
+  footer .spacer { flex:1; }
+</style>
+</head>
+<body>
+
+<a id="top"></a>
+<header class="hero wrap">
+  <img class="logo" src="assets/monotheme-logo.png" alt="monotheme logo">
+  <h1>monotheme</h1>
+  <p class="tag">One theme — a full VSCode/shiki theme — projected into every tool, switched with one command that live-reloads everything.</p>
+  <div class="cta">
+    <a class="btn primary" href="#install">Get started</a>
+    <a class="btn ghost" href="https://github.com/eduwass/monotheme">View on GitHub</a>
+  </div>
+  <div class="pill">No per-tool hand-porting. <b>One source of truth.</b></div>
+</header>
+
+<!-- demo video -->
+<section class="wrap" style="padding-top:24px">
+  <div class="video-card">
+    <video autoplay loop muted playsinline preload="metadata" poster="assets/monotheme-logo.png">
+      <source src="https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c" type="video/mp4">
+    </video>
+  </div>
+</section>
+
+<!-- how it works -->
+<section id="how" class="wrap">
+  <h2><span class="num">01</span>How it works</h2>
+  <p class="lead">The fat format (a full VSCode theme) stays canonical. monotheme projects it
+    <em>down</em> to 16-color ANSI for simple tools and passes it <em>through</em> at full fidelity
+    for smart ones — so one file fans out into your whole environment.</p>
+  <div id="flow"></div>
+  <div class="legend">
+    <span><i style="background:var(--cyan)"></i>terminal</span>
+    <span><i style="background:var(--green)"></i>TUI / shell</span>
+    <span><i style="background:var(--purple)"></i>editors</span>
+    <span><i style="background:var(--pink)"></i>agents</span>
+    <span><i style="background:var(--orange)"></i>syntax export</span>
+    <span><i style="background:var(--accent)"></i>system</span>
+  </div>
+</section>
+
+<!-- compatible tools -->
+<section id="tools" class="wrap">
+  <h2><span class="num">02</span>Compatible tools</h2>
+  <p class="lead">Every target detects whether the tool is present and no-ops if not, so you only
+    theme what you have. Adding another is a small adapter away.</p>
+  <div class="toolgrid">
+    <div class="card"><h3><i style="background:var(--cyan)"></i>Terminals</h3>
+      <div class="chips"><span class="chip">ghostty</span><span class="chip">any 16-ANSI terminal</span></div></div>
+    <div class="card"><h3><i style="background:var(--green)"></i>TUI / shell</h3>
+      <div class="chips"><span class="chip">tmux</span><span class="chip">btop</span><span class="chip">fzf</span><span class="chip">lazygit</span><span class="chip">yazi</span><span class="chip">herdr</span></div></div>
+    <div class="card"><h3><i style="background:var(--purple)"></i>Editors</h3>
+      <div class="chips"><span class="chip">VSCode</span><span class="chip">Cursor</span><span class="chip">Zed</span><span class="chip">Neovim</span></div>
+      <p style="margin:12px 0 0;font-size:13px">chrome + TextMate syntax parity</p></div>
+    <div class="card"><h3><i style="background:var(--pink)"></i>Agents / dev</h3>
+      <div class="chips"><span class="chip">opencode</span><span class="chip">Claude Code</span><span class="chip">hunk</span></div></div>
+    <div class="card"><h3><i style="background:var(--orange)"></i>Syntax export</h3>
+      <div class="chips"><span class="chip">.tmTheme</span><span class="chip">shiki JSON</span><span class="chip">base16</span></div>
+      <p style="margin:12px 0 0;font-size:13px">bat / Sublime / any base16 tool</p></div>
+    <div class="card"><h3><i style="background:var(--accent)"></i>System (macOS)</h3>
+      <div class="chips"><span class="chip">accent color</span><span class="chip">Raycast</span></div></div>
+  </div>
+</section>
+
+<!-- install -->
+<section id="install" class="wrap">
+  <h2><span class="num">03</span>Install</h2>
+  <p class="lead">Requires <a href="https://bun.sh">Bun</a>. Clone, install, point each tool's
+    config at the slot once — future switches are automatic.</p>
+  <div class="grid2">
+    <div>
+      <h3 style="margin:0 0 10px">Set it up</h3>
+      <pre class="code"><span class="c"># clone + install</span>
+<span class="k">git</span> clone https://github.com/eduwass/monotheme
+<span class="k">cd</span> monotheme
+<span class="k">bun</span> install
+
+<span class="c"># list available themes</span>
+<span class="k">bun</span> run src/cli.ts list</pre>
+    </div>
+    <div>
+      <h3 style="margin:0 0 10px">Switch themes</h3>
+      <pre class="code"><span class="c"># project a theme everywhere + live-reload</span>
+<span class="k">theme</span> set shades-of-purple
+<span class="k">theme</span> set github-light
+<span class="k">theme</span> set catppuccin-mocha
+
+<span class="c"># the active theme</span>
+<span class="k">theme</span> current</pre>
+    </div>
+  </div>
+  <p class="lead" style="margin-top:18px">Full launcher + per-tool wiring:
+    <a href="https://github.com/eduwass/monotheme/blob/main/docs/INSTALL.md">docs/INSTALL.md</a>.</p>
+</section>
+
+<!-- contribute -->
+<section id="contribute" class="wrap">
+  <h2><span class="num">04</span>Contribute</h2>
+  <p class="lead">The highest-leverage contribution is a new tool adapter — theme one tool and
+    everyone gets it for free. Adapters are small, pure functions; syntax colors are verified
+    token-for-token against shiki.</p>
+  <div class="grid2">
+    <div class="card">
+      <h3>Add a tool adapter</h3>
+      <p>A <code>to*(theme)</code> function returns your tool's format; a target writes it and reloads.
+        Most adapters are 20–40 lines.</p>
+      <a class="btn ghost" href="https://github.com/eduwass/monotheme/blob/main/docs/ADAPTERS.md">Adapter guide</a>
+    </div>
+    <div class="card">
+      <h3>Ground rules</h3>
+      <p>Pure adapters, no new deps, detect-and-no-op when a tool is absent, and verify syntax against the shiki oracle.</p>
+      <a class="btn ghost" href="https://github.com/eduwass/monotheme/blob/main/CONTRIBUTING.md">Contributing</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>monotheme — MIT</span>
+    <div class="spacer"></div>
+    <a href="https://github.com/eduwass/monotheme">Repo</a>
+    <a href="https://github.com/eduwass/monotheme/issues">Issues</a>
+    <a href="https://github.com/eduwass/monotheme/blob/main/LICENSE">License</a>
+  </div>
+</footer>
+
+<script type="module">
+  import React from 'https://esm.sh/react@18.3.1';
+  import { createRoot } from 'https://esm.sh/react-dom@18.3.1/client';
+  import { ReactFlow, Background } from 'https://esm.sh/@xyflow/react@12?deps=react@18.3.1,react-dom@18.3.1';
+  import htm from 'https://esm.sh/htm@3.1.1';
+  const html = htm.bind(React.createElement);
+
+  const C = {
+    cyan:'#9effff', green:'#3ad900', purple:'#b362ff',
+    pink:'#fc199a', orange:'#ff9d00', accent:'#fad000',
+  };
+
+  // tool -> category color
+  const tools = [
+    ['ghostty', C.cyan],
+    ['tmux', C.green], ['btop', C.green], ['fzf', C.green],
+    ['lazygit', C.green], ['yazi', C.green], ['herdr', C.green],
+    ['cursor', C.purple], ['vscode', C.purple], ['zed', C.purple], ['neovim', C.purple],
+    ['opencode', C.pink], ['claude code', C.pink], ['hunk', C.pink],
+    ['bat', C.orange],
+    ['raycast', C.accent], ['macOS accent', C.accent],
+  ];
+
+  const n = tools.length;
+  const STEP = 58;
+  const colH = (n - 1) * STEP;
+
+  const nodeBase = {
+    color:'#ece8ff', background:'#2d2b55', border:'1px solid #3a3568',
+    borderRadius:'9px', fontSize:'13px', fontFamily:"'JetBrains Mono',monospace",
+    padding:'8px 12px', width:148, textAlign:'left',
+  };
+
+  const srcNode = {
+    id:'src', position:{ x:30, y:colH/2 - 24 },
+    sourcePosition:'right', targetPosition:'left',
+    data:{ label: html`<div style=${{textAlign:'center'}}>
+      <div style=${{fontWeight:800,fontSize:'15px',color:'#fad000'}}>theme.json</div>
+    </div>` },
+    style:{ ...nodeBase, width:170, padding:'14px 16px', borderColor:'#fad000',
+      background:'linear-gradient(180deg,#34315f,#2a2850)', boxShadow:'0 0 0 3px rgba(250,208,0,.12)' },
+  };
+
+  const toolNodes = tools.map(([name,color],i)=>({
+    id:'t'+i, position:{ x:560, y:i*STEP },
+    targetPosition:'left', sourcePosition:'right',
+    data:{ label: name },
+    style:{ ...nodeBase, borderLeft:`3px solid ${color}` },
+  }));
+
+  const edges = tools.map(([,color],i)=>({
+    id:'e'+i, source:'src', target:'t'+i, animated:true,
+    style:{ stroke:color, strokeWidth:1.5, opacity:.75 },
+  }));
+
+  const nodes = [srcNode, ...toolNodes];
+
+  function App(){
+    return html`<${ReactFlow}
+      nodes=${nodes} edges=${edges}
+      fitView=${true} fitViewOptions=${{ padding:0.15 }}
+      minZoom=${0.2} maxZoom=${1.5}
+      nodesDraggable=${true} nodesConnectable=${false} elementsSelectable=${false}
+      zoomOnScroll=${false} panOnScroll=${false} preventScrolling=${false}
+      proOptions=${{ hideAttribution:false }}>
+      <${Background} color="#3a3568" gap=${22} size=${1} />
+    <//>`;
+  }
+
+  createRoot(document.getElementById('flow')).render(html`<${App} />`);
+</script>
+</body>
+</html>
