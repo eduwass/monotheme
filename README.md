@@ -2,6 +2,8 @@
   <img src="assets/monotheme-logo.png" alt="monotheme" width="40%">
 </p>
 
+https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c
+
 # monotheme
 
 One source of truth — a **standard editor theme** (the `colors` + `tokenColors`
