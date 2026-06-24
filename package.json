@@ -1,11 +1,27 @@
 {
-  "name": "theme-engine",
+  "name": "monotheme",
   "version": "0.1.0",
   "type": "module",
-  "private": true,
-  "description": "One source of truth (a VSCode theme) projected into every tool's native format.",
+  "description": "One source of truth (a VSCode/shiki theme) projected into every tool's native format, switched with one live-reloading command.",
+  "license": "MIT",
+  "author": "Edu Wass",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eduwass/monotheme.git"
+  },
+  "homepage": "https://github.com/eduwass/monotheme#readme",
+  "keywords": [
+    "theme",
+    "colorscheme",
+    "vscode",
+    "textmate",
+    "shiki",
+    "terminal",
+    "ansi",
+    "dotfiles"
+  ],
   "bin": {
-    "theme": "./src/cli.ts"
+    "monotheme": "./src/cli.ts"
   },
   "scripts": {
     "check": "bun run src/cli.ts check",

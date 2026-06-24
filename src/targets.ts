@@ -1,7 +1,7 @@
 // The only machine-specific surface: where each tool's theme file lives + how to
 // reload it. Keeping this isolated keeps the engine itself OSS-portable.
 import { homedir } from "node:os";
-import { join, resolve, dirname } from "node:path";
+import { join, dirname } from "node:path";
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import type { VscodeTheme } from "./load.ts";
@@ -31,7 +31,6 @@ const hasCmd = (cmd: string) => () => {
   try { execSync(`command -v ${cmd}`, { stdio: "ignore" }); return true; } catch { return false; }
 };
 
-const REPO = resolve(dirname(new URL(import.meta.url).pathname), "..", "..");
 
 export interface TargetCtx {
   theme: VscodeTheme;
@@ -74,28 +73,28 @@ function editorSelector(name: string, appDir: string): Target {
 // overwrites the slot rather than editing the tool's config (no repo churn).
 export const SLOT = "dotfiles";
 
-// Cross-machine theme sync (the user's two-machine Mac+devbox setup): after
-// applying locally, mirror the switch to the peer so every CLI on both machines
-// tracks the same theme. devbox→Mac uses the always-on `devbox local`
-// ControlMaster; Mac→devbox uses Tailscale SSH with BatchMode so it fails fast
-// (rather than hanging on a TOTP prompt) when no live session exists. The peer
-// runs with --no-propagate to break the echo. Kept here as the machine-specific
-// boundary; returns null on any other host.
+// Optional cross-machine theme sync. Set one of these in your shell rc and every
+// `theme set` mirrors the switch to that machine so all tools on both stay on the
+// same theme:
+//   THEME_PEER=<ssh-host>   — sync over plain SSH (BatchMode, fails fast if down).
+//   THEME_PEER_CMD=<tmpl>   — bring your own transport; `{}` is replaced with the
+//                             remote command (e.g. THEME_PEER_CMD='mybox run {}').
+// We ship the resolved theme JSON (base64) and apply it from a file there, so the
+// peer needn't have the theme installed. PATH is set explicitly since
+// non-interactive shells may omit ~/.local/bin or bun. The peer runs with
+// --no-propagate to break the echo. Neither set → no sync (returns null).
 export function peerThemeCommand(themeB64: string): { peer: string; cmd: string } | null {
-  // ship the resolved theme JSON (base64) to the peer and apply it from a file —
-  // the peer needn't have the theme installed. PATH is set explicitly since
-  // non-interactive shells may not include ~/.local/bin or bun.
+  const peer = process.env.THEME_PEER;
+  const custom = process.env.THEME_PEER_CMD;
+  if (!peer && !custom) return null;
   const apply =
     `export PATH="$HOME/.local/bin:$HOME/.bun/bin:$PATH"; mkdir -p "$HOME/.cache" && ` +
     `echo ${themeB64} | base64 --decode > "$HOME/.cache/theme-sync.json" && ` +
     `theme set "$HOME/.cache/theme-sync.json" --no-propagate`;
-  if (process.platform === "darwin") {
-    return { peer: "devbox", cmd: `ssh -o BatchMode=yes -o ConnectTimeout=8 devbox '${apply}'` };
+  if (custom) {
+    return { peer: peer ?? "peer", cmd: custom.includes("{}") ? custom.replace("{}", apply) : `${custom} '${apply}'` };
   }
-  if (process.platform === "linux") {
-    return { peer: "Mac", cmd: `devbox local '${apply}'` };
-  }
-  return null;
+  return { peer: peer!, cmd: `ssh -o BatchMode=yes -o ConnectTimeout=8 ${peer} '${apply}'` };
 }
 
 export const TARGETS: Target[] = [
@@ -111,8 +110,8 @@ export const TARGETS: Target[] = [
   {
     name: "ghostty",
     mode: "generated",
-    // ~/.config/ghostty is symlinked into the repo; config pins `theme = dotfiles`.
-    dest: () => join(REPO, ".config", "ghostty", "themes", SLOT),
+    // config pins `theme = dotfiles`; we overwrite that slot under ~/.config.
+    dest: () => cfg("ghostty", "themes", SLOT),
     render: toGhostty,
     // macOS ghostty ignores SIGUSR2 (config isn't auto-watched — ghostty#3643), so
     // drive its AppleScript `perform action "reload_config"`; Linux uses SIGUSR2.
@@ -255,9 +254,9 @@ export const TARGETS: Target[] = [
     // (2) SYNTAX comes from nvim-textmate, which tokenizes with the same TextMate
     // grammars + theme file as Cursor/shiki (true parity). We hand it the active
     // theme's editor label; it loads the identical file from ~/.cursor/extensions.
-    // ~/.config/nvim is symlinked into the repo, so both slots live at REPO paths.
+    // Both slots live under ~/.config/nvim; colorscheme = "dotfiles" selects them.
     apply: ({ theme }) => {
-      const nvimDir = join(REPO, ".config", "nvim");
+      const nvimDir = cfg("nvim");
       // (1) chrome colorscheme
       const colors = join(nvimDir, "colors", "dotfiles.lua");
       mkdirSync(dirname(colors), { recursive: true });
