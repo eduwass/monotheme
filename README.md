@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/monotheme-logo.png" alt="monotheme" width="40%">
+</p>
+
 # monotheme
 
 One source of truth — a **standard editor theme** (the `colors` + `tokenColors`
