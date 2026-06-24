@@ -96,9 +96,6 @@ ANSI 16, accents, …) and `resolveToken` resolves any TextMate scope to its col
 via the ported matcher → each **adapter** renders that into one tool's format →
 **targets** write the file to the right place and reload the running app.
 
-The full design rationale and format/reload notes per tool live in
-[`SPEC.md`](SPEC.md).
-
 ## Adding a tool
 
 Adapters are small and self-contained. See [`docs/ADAPTERS.md`](docs/ADAPTERS.md)
