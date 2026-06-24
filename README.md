@@ -68,11 +68,13 @@ Requires [Bun](https://bun.sh).
 git clone https://github.com/eduwass/monotheme
 cd monotheme
 bun install
-bun run src/cli.ts list
+bun link          # exposes the `theme` command on your PATH
+theme list
 ```
 
-Add a `theme` command to your PATH by symlinking a launcher, or run via `bun`
-directly. See [`docs/INSTALL.md`](docs/INSTALL.md).
+`bun link` registers the `theme` (and `monotheme`) command into Bun's global bin
+dir. Prefer not to link? Run it directly: `bun src/cli.ts list`. See
+[`docs/INSTALL.md`](docs/INSTALL.md) for per-tool wiring and `theme init`.
 
 ## Usage
 
