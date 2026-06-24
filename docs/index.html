@@ -65,9 +65,13 @@
   .lead { color:var(--muted); max-width:720px; margin:0 0 36px; font-size:17px; }
 
   /* video */
-  .video-card { border:1px solid var(--line); overflow:hidden;
-    background:#000; box-shadow:0 24px 80px rgba(0,0,0,.45); }
-  .video-card video { display:block; width:100%; height:auto; }
+  .video-card { position:relative; border:1px solid var(--line); overflow:hidden;
+    background:#16152e; box-shadow:0 24px 80px rgba(0,0,0,.45); }
+  .video-card video { display:block; width:100%; height:auto; aspect-ratio:3320 / 2060; background:#16152e; }
+  .skeleton { position:absolute; inset:0; z-index:1; pointer-events:none;
+    background:linear-gradient(100deg,#1e1d44 28%,#2c2a58 50%,#1e1d44 72%);
+    background-size:200% 100%; animation:shimmer 1.5s linear infinite; }
+  @keyframes shimmer { from{ background-position:200% 0 } to{ background-position:-200% 0 } }
 
   /* flow */
   #flow { height:640px; width:100%; border:1px solid var(--line); border-radius:16px;
@@ -121,7 +125,9 @@
 <!-- demo video -->
 <section class="wrap" style="padding-top:24px">
   <div class="video-card">
-    <video autoplay loop muted playsinline preload="metadata" poster="https://raw.githubusercontent.com/eduwass/monotheme/main/assets/monotheme-logo.png">
+    <div class="skeleton" id="vidskel"></div>
+    <video autoplay loop muted playsinline preload="auto"
+           onplaying="var s=document.getElementById('vidskel'); if(s) s.style.display='none';">
       <source src="https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c" type="video/mp4">
     </video>
   </div>
@@ -180,8 +186,11 @@
 <span class="k">cd</span> monotheme
 <span class="k">bun</span> install
 
+<span class="c"># expose the `theme` command on your PATH</span>
+<span class="k">bun</span> link
+
 <span class="c"># list available themes</span>
-<span class="k">bun</span> run src/cli.ts list</pre>
+<span class="k">theme</span> list</pre>
     </div>
     <div>
       <h3 style="margin:0 0 10px">Switch themes</h3>

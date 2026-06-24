@@ -21,7 +21,8 @@
     "dotfiles"
   ],
   "bin": {
-    "monotheme": "./src/cli.ts"
+    "monotheme": "./src/cli.ts",
+    "theme": "./src/cli.ts"
   },
   "scripts": {
     "check": "bun run src/cli.ts check",

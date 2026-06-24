@@ -10,20 +10,19 @@ bun install
 
 ## A `theme` command on your PATH
 
-monotheme runs `.ts` directly with Bun. Add a tiny launcher so you can type
-`theme` anywhere:
+`bun link` registers the package's bins (`theme` and `monotheme`, both running the
+CLI directly via Bun) into Bun's global bin directory:
 
 ```sh
-mkdir -p ~/.local/bin
-cat > ~/.local/bin/theme <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-exec bun "$HOME/monotheme/src/cli.ts" "$@"
-EOF
-chmod +x ~/.local/bin/theme
+cd ~/monotheme
+bun link
+theme list
 ```
 
-Make sure `~/.local/bin` is on your `PATH`.
+Make sure Bun's global bin dir (`~/.bun/bin` by default) is on your `PATH`.
+
+> Prefer no global link? Run it directly instead — `bun ~/monotheme/src/cli.ts <cmd>`
+> — or drop a one-line launcher on your `PATH` that execs that.
 
 ## Re-apply on shell start
 
