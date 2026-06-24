@@ -6,18 +6,13 @@ gets it for free.
 
 ## The model
 
-```
-VSCode theme JSON
-      │  load()            parse + normalize
-      ▼
-  VscodeTheme  ───────────────────────────────────────────┐
-      │  project()         derive a flat palette           │  resolveToken()
-      ▼                                                     ▼  any TextMate scope
-   Projection  (bg, fg, accent, ansi[16], …)        scope → { fg, italic, … }
-      │
-      │  your adapter:  toMyTool(theme) -> string | object
-      ▼
-   targets.ts          write it to the right path + reload the running app
+```mermaid
+flowchart TD
+    A["VSCode theme JSON"] -->|"load() — parse + normalize"| B["VscodeTheme"]
+    B -->|"project() — derive a flat palette"| C["Projection<br/>(bg, fg, accent, ansi[16], …)"]
+    B -->|"resolveToken() — any TextMate scope"| D["scope → { fg, italic, … }"]
+    C -->|"your adapter: toMyTool(theme) → string/object"| E["targets.ts<br/>write to the right path + reload the running app"]
+    D -.->|"used by adapters that want real syntax colors"| E
 ```
 
 Two helpers give you everything:
