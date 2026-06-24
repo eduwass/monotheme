@@ -6,6 +6,10 @@ https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c
 
 # monotheme
 
+> [!WARNING]
+> **Alpha.** monotheme is early and evolving — APIs, adapters and theme output may
+> change without notice. Expect rough edges; issues and PRs welcome.
+
 One source of truth — a **standard editor theme** (the `colors` + `tokenColors`
 JSON that VSCode, Cursor, Zed and [shiki](https://shiki.style) all read) —
 projected into every tool's native format, switched with a single command that
