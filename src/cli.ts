@@ -63,8 +63,8 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
   const canonical = JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors });
   writeFileSync(ACTIVE, canonical + "\n");
   // vendor editor-sourced themes into the repo's tracked themes/ dir so they're
-  // version-controlled and discoverable on every machine (devbox has no editor
-  // extensions). idempotent; commit via the normal dotfiles flow.
+  // version-controlled and discoverable on every machine (e.g. servers with no
+  // editor extensions installed). idempotent.
   // Only vendor ONCE (when missing) — rewriting on every switch reserializes the
   // file, stripping authored comments and reordering keys, which churns the repo
   // on each theme change. A present vendored copy is already the source of truth.
@@ -130,14 +130,15 @@ switch (cmd) {
   case "raycast": {
     // Raycast stores themes in an encrypted DB (no silent write), so the only
     // sanctioned apply path is its import deeplink — one confirm click. Build it
-    // from the active theme and open it (Mac-only; from devbox, via `devbox local`).
+    // from the active theme and open it. Raycast is macOS-only; elsewhere we just
+    // print the URL to open on a Mac.
     let theme;
     if (existsSync(ACTIVE)) theme = loadTheme(ACTIVE);
     else if (existsSync(STATE)) theme = loadTheme(resolveTheme(readFileSync(STATE, "utf8").trim())!.path);
     else { console.error("theme: no active theme (run: theme set <name>)"); process.exit(1); }
     const url = raycastImportUrl(theme);
-    const open = process.platform === "darwin" ? `open '${url}'` : `devbox local "open '${url}'"`;
-    try { execSync(open, { stdio: "ignore" }); console.log(`raycast: opened import for ${theme.name} — confirm in Raycast`); }
+    if (process.platform !== "darwin") { console.log(`raycast: open this on your Mac to import:\n  ${url}`); break; }
+    try { execSync(`open '${url}'`, { stdio: "ignore" }); console.log(`raycast: opened import for ${theme.name} — confirm in Raycast`); }
     catch { console.log(`raycast: open this to import:\n  ${url}`); }
     break;
   }

@@ -109,8 +109,8 @@ for ones you want frozen in the repo. The in-repo copies (`.config/git-split-dif
 `yazi/*.shiki.json`) become *generated outputs* once the engine exists, not sources.
 
 **Step 0 of implementation:** wire `theme list` to parse `contributes.themes` from the
-extension dirs (via `devbox local "…"` when building on devbox); confirm it enumerates the
-~69 themes. Use SoP standard as the first end-to-end test theme.
+installed editor extension dirs; confirm it enumerates the available themes. Use Shades
+of Purple as the first end-to-end test theme.
 
 ---
 
@@ -292,7 +292,7 @@ Columns: **family** · **current repo path / how it selects today** · **require
 | **delta** | tmTheme (via bat) | `home/.gitconfig` `[delta] syntax-theme = Shades-of-Purple` | reuses bat's tmTheme | per-invocation (rerun `bat cache --build` after theme change) |
 | **yazi** | tmTheme + shiki | `.config/yazi/theme.toml` `[flavor] dark/light="shades-of-purple"`; pkg `flavors/shades-of-purple.yazi/` (`flavor.toml` + `tmtheme.xml`) | `flavor.toml` UI styles + `tmtheme.xml` syntax | ⚠ **next-launch only** |
 | **btop** | flat | `.config/btop/btop.conf` `color_theme = "shades-of-purple"`; theme at `.config/btop/themes/shades-of-purple.theme` | `theme[main_bg]`,`main_fg`,`title`,`hi_fg`,`selected_bg/fg`,`inactive_fg`, box borders `cpu/mem/net/proc_box`,`div_line`, gradient triplets `cpu/temp/mem/net/process_*_{start,mid,end}` | **Yes** — `pkill -SIGUSR2 btop` (file edits not watched; signal or in-app menu) |
-| **herdr** | flat | `.config/herdr/config.toml` `[theme.custom]` (`base`,`panel_bg`,`surface0/1`,…, hex) | the `[theme.custom]` key set | server `reload-config` for config-only; **code change → full restart** (see dotfiles CLAUDE.md herdr gotcha) |
+| **herdr** | flat | `.config/herdr/config.toml` `[theme.custom]` (`base`,`panel_bg`,`surface0/1`,…, hex) | the `[theme.custom]` key set | server `reload-config` for config-only changes; a code change needs a full restart |
 | **hunk** (gh-dash pager) | passthrough + flat | `.config/hunk/config.toml` `theme="custom"` + `[custom_theme]` UI + `syntax_theme="shades-of-purple.json"` (a VSCode JSON!) | `[custom_theme]` UI keys (`label`,`accent`,`panel`,`noteBorder`,…) + `[custom_theme.syntax]` + the passthrough `syntax_theme` JSON | per-invocation |
 | **git-split-diffs** | passthrough | `home/.gitconfig` `split-diffs.theme-name`; JSON at `.config/git-split-diffs/shades-of-purple.json` (**= canonical seed**) | `SYNTAX_HIGHLIGHTING_THEME` (shiki id) + line/border color objects | per-invocation |
 | **opencode** | flat / projection | `.config/opencode/tui.json` `"theme":"shades-of-purple"`; theme at `.config/opencode/themes/<name>.json` (`$schema` + `defs` named hex + semantic `theme` w/ native dark/light per token) | opencode semantic schema (text, primary, accent, syntax.*, diff*, border) ← projection roles | restart / next-launch |
@@ -320,29 +320,28 @@ Columns: **family** · **current repo path / how it selects today** · **require
   colors need real authored choices; SoP ships an official light variant. So:
   `themes/<name>-dark.json` + `themes/<name>-light.json`. The switcher selects the file;
   it never invents colors. Drives off the VSCode `"type"` field.
-- **Switch trigger differs per machine** (two-machine setup — see global CLAUDE.md):
-  - **Mac:** can auto-follow OS appearance (`defaults read -g AppleInterfaceStyle` →
-    `Dark`/absent=Light). Optional: a watcher flips variant on OS change.
-  - **devbox:** no OS appearance → **explicit `--variant` arg / manual** only.
-  - Keep the switcher arg-driven; OS-follow is an optional Mac-only layer on top.
+- **Switch trigger differs per environment:**
+  - **Desktop (macOS):** can auto-follow OS appearance (`defaults read -g
+    AppleInterfaceStyle` → `Dark`/absent=Light). Optional: a watcher flips variant.
+  - **Headless:** no OS appearance → **explicit `--variant` arg / manual** only.
+  - Keep the switcher arg-driven; OS-follow is an optional desktop-only layer on top.
 - Reuse omarchy's `light.mode` marker idea if a tool needs a boolean "is light" at
   consume time (e.g. yazi `theme.toml` already has separate `dark`/`light` flavor slots).
 
 ---
 
-## 7. Two-machine & fork constraints (from this repo's CLAUDE.md)
+## 7. Cross-machine & build-time constraints
 
-- **Two machines** (Mac + devbox). The engine runs on whichever shell it's invoked in;
-  config files are *source* on the Mac and need `dotfiles-sync` + reload on devbox.
-  Don't assume Homebrew/launchctl (Mac) vs systemd (devbox). Switcher reload hooks must
-  no-op gracefully when a tool isn't running on that machine.
-- **Forks carry hardcoded SoP** (`forks/lumen/src/command/diff/theme.rs`, oyo Rust) —
-  these are **baked at build time**, out of scope for live switching. Name the ceiling;
-  don't try to regenerate compiled binaries. `ponytail:` mark them.
-- **herdr live-upgrade gotcha:** config-only change → `herdr server reload-config`;
-  code change → full server restart. The theme engine only touches config, so
-  `reload-config` is the right hook.
-- **No AI attribution** in any commit/PR/pushed content (global rule).
+- **Portable across OSes.** The engine runs in whichever shell it's invoked in.
+  Don't assume a package manager or init system (Homebrew/launchctl vs apt/systemd).
+  Reload hooks must no-op gracefully when a tool isn't running on that machine.
+- **Build-time-baked themes are out of scope.** Some tools compile a theme into their
+  binary; those can't be live-switched. Name the ceiling rather than trying to
+  regenerate compiled artifacts.
+- **Config-only reloads.** The engine only writes config/theme files. Prefer a tool's
+  config-reload hook over a full restart wherever one exists.
+- **Optional cross-machine sync** is opt-in via `THEME_PEER` / `THEME_PEER_CMD` (§see
+  README), so a switch on one machine can mirror to another.
 
 ---
 
@@ -418,10 +417,9 @@ real visual confirm.
 3. **Light/dark: manual for now.** Switcher is `--variant dark|light` (arg-driven).
    No OS-follow watcher in v1; Mac auto-follow (`AppleInterfaceStyle`) is a later
    optional layer.
-4. **Two machines: afterthought / deferred.** Build single-machine (run `theme set`
-   on whichever box). No `dotfiles-sync` + remote-reload orchestration in v1. Reload
-   hooks should still no-op gracefully when a tool isn't running. Cross-machine
-   distribution is a later add-on, not a v1 concern.
+4. **Cross-machine: deferred.** Build single-machine first (run `theme set` on
+   whichever box). Reload hooks should still no-op gracefully when a tool isn't
+   running. Cross-machine sync (now `THEME_PEER`) is a later add-on, not a v1 concern.
 5. **Per-tool generation mode: generate by default, opt out per tool** (`generated` /
    `manual` / `selector` — see §3 "Per-tool generation mode"). nvim = `selector`→plugin
    with generated fallback; herdr = `manual` (keep hand-tuned); cursor/vscode = `selector`

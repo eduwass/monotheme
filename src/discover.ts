@@ -58,7 +58,7 @@ export function discover(): ThemeEntry[] {
   }
 
   // 2) local repo themes — fallback for slugs no editor provides (and for
-  //    machines without editors installed, e.g. devbox).
+  //    machines without editors installed, e.g. a headless server).
   if (existsSync(LOCAL_THEMES)) {
     for (const f of readdirSync(LOCAL_THEMES)) {
       if (!f.endsWith(".json")) continue;
