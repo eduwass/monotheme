@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> tmux @color-* user vars. The user's tmux.conf references
 // #{@color-accent} etc.; we just (re)define them, then `tmux source-file`.
 import type { VscodeTheme } from "../load.ts";
@@ -15,3 +16,12 @@ export function toTmux(theme: VscodeTheme): string {
     `set -g @color-border-active "${p.borderActive}"`,
   ].join("\n") + "\n";
 }
+
+export default defineTarget({
+  name: "tmux",
+  // .tmux.conf sources this file; we (re)define the @color-* vars, then re-source
+  // into every running server (no-op if none).
+  file: (c) => c.config("tmux", "theme.conf"),
+  render: (c) => toTmux(c.theme),
+  reload: (c) => `tmux source-file "${c.config("tmux", "theme.conf")}"`,
+});

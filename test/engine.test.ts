@@ -4,8 +4,8 @@ import { resolve, dirname } from "node:path";
 import plist from "plist";
 import { loadTheme, stripAlpha } from "../src/load.ts";
 import { project, ANSI_KEYS } from "../src/project.ts";
-import { toTmTheme } from "../src/adapters/tmtheme.ts";
-import { toGhostty } from "../src/adapters/ghostty.ts";
+import { toTmTheme } from "../src/formats/tmtheme.ts";
+import { toGhostty } from "../src/targets/ghostty.ts";
 import { discover, slugify } from "../src/discover.ts";
 
 const D = dirname(new URL(import.meta.url).pathname);
@@ -79,9 +79,9 @@ test("tmTheme: valid plist with global background + one rule per token", () => {
 });
 
 test("tmTheme: name override pins a stable slot (and is deterministic)", () => {
-  const a = toTmTheme(sop, { name: "Dotfiles" });
-  const b = toTmTheme(sop, { name: "Dotfiles" });
-  expect((plist.parse(a) as any).name).toBe("Dotfiles");
+  const a = toTmTheme(sop, { name: "Monotheme" });
+  const b = toTmTheme(sop, { name: "Monotheme" });
+  expect((plist.parse(a) as any).name).toBe("Monotheme");
   expect(a).toBe(b); // no Date/random -> byte-identical across runs
 });
 
@@ -97,10 +97,10 @@ test("ghostty: 16 ordered palette lines + bg/fg/cursor from projection", () => {
 });
 
 test("zed: valid theme family with style + syntax + ansi", () => {
-  const { toZed } = require("../src/adapters/zed.ts");
+  const { toZed } = require("../src/targets/zed.ts");
   const z = JSON.parse(toZed(sop));
-  expect(z.name).toBe("Dotfiles");
-  expect(z.themes[0].name).toBe("Dotfiles");
+  expect(z.name).toBe("Monotheme");
+  expect(z.themes[0].name).toBe("Monotheme");
   expect(z.themes[0].appearance).toBe("dark");
   expect(z.themes[0].style.background).toBe("#2D2B55");
   expect(z.themes[0].style["terminal.ansi.red"]).toBe("#EC3A37");
@@ -124,12 +124,12 @@ test("patchJsonStringKey: replaces existing key, inserts missing, preserves rest
   expect(s).toContain('"workbench.colorTheme": "New Theme"');
   expect(s).toContain("// keep me");        // comment preserved
   expect(s).toContain('"other": 1');         // other keys preserved
-  patchJsonStringKey(f, "theme", "Dotfiles"); // insert missing
-  expect(readFileSync(f, "utf8")).toContain('"theme": "Dotfiles"');
+  patchJsonStringKey(f, "theme", "Monotheme"); // insert missing
+  expect(readFileSync(f, "utf8")).toContain('"theme": "Monotheme"');
 });
 
 test("opencode: full semantic schema, accent gold, syntax mapped", () => {
-  const { toOpencode } = require("../src/adapters/opencode.ts");
+  const { toOpencode } = require("../src/targets/opencode.ts");
   const o = JSON.parse(toOpencode(sop)).theme;
   expect(o.accent.dark).toBe("#FAD000");
   expect(o.background.dark).toBe("#2D2B55");
@@ -139,7 +139,7 @@ test("opencode: full semantic schema, accent gold, syntax mapped", () => {
 });
 
 test("claude: name/base/overrides with gold accent + diff colors", () => {
-  const { toClaude } = require("../src/adapters/claude.ts");
+  const { toClaude } = require("../src/targets/claude.ts");
   const cl = JSON.parse(toClaude(sop));
   expect(cl.base).toBe("dark");
   expect(cl.overrides.claude).toBe("#FAD000");
@@ -149,7 +149,7 @@ test("claude: name/base/overrides with gold accent + diff colors", () => {
 });
 
 test("macos-accent: maps theme accent to nearest preset", () => {
-  const { nearestAccent } = require("../src/adapters/macos-accent.ts");
+  const { nearestAccent } = require("../src/targets/macos-accent.ts");
   expect(nearestAccent(sop).name).toBe("Yellow");   // SoP gold #FAD000
   expect(nearestAccent(gh).name).toBe("Green");       // GitHub's accent is its green button #238636
 });
@@ -182,9 +182,9 @@ test("resolveToken: scope segments colliding with Object.prototype don't break t
 });
 
 test("nvim: colorscheme carries resolved syntax (VSCode parity) + chrome + term", () => {
-  const { toNvim } = require("../src/adapters/nvim.ts");
+  const { toNvim } = require("../src/targets/nvim.ts");
   const lua = toNvim(sop);
-  expect(lua).toContain('vim.g.colors_name = "dotfiles"');
+  expect(lua).toContain('vim.g.colors_name = "monotheme"');
   expect(lua).toContain('vim.o.background = "dark"');
   expect(lua).toContain('"Normal", { bg = "#2D2B55"'); // editor.background
   expect(lua).toContain('vim.g.terminal_color_1 = "#EC3A37"'); // ansi red
@@ -196,7 +196,7 @@ test("nvim: colorscheme carries resolved syntax (VSCode parity) + chrome + term"
 });
 
 test("lazygit: theme block maps roles + in-place replace preserves git.pagers", () => {
-  const { toLazygit } = require("../src/adapters/lazygit.ts");
+  const { toLazygit } = require("../src/targets/lazygit.ts");
   const block = toLazygit(sop);
   expect(block).toContain('activeBorderColor:');
   expect(block).toContain(`- "${project(sop).accent}"`); // gold active border
@@ -214,6 +214,30 @@ test("mix: blends two hex colors for readable muted ladders", () => {
   const { mix } = require("../src/load.ts");
   expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");
   expect(mix("#2D2B55", "#FFFFFF", 0)).toBe("#2D2B55");
+});
+
+test("terminal adapters: emit the 16-color palette + bg/fg in each native format", () => {
+  const { toAlacritty } = require("../src/targets/alacritty.ts");
+  const { toKitty } = require("../src/targets/kitty.ts");
+  const { toWezterm } = require("../src/targets/wezterm.ts");
+  const { toWarp } = require("../src/targets/warp.ts");
+  const p = project(sop);
+  const al = toAlacritty(sop);
+  expect(al).toContain("[colors.normal]");
+  expect(al).toContain("[colors.bright]");
+  expect(al).toContain(`background = "${p.bg}"`);
+  expect(al).toContain(`white = "${p.ansi[15]}"`);
+  const k = toKitty(sop);
+  expect(k).toContain(`background ${p.bg}`);
+  for (let i = 0; i < 16; i++) expect(k).toContain(`color${i} ${p.ansi[i]}`);
+  const w = toWezterm(sop);
+  expect(w).toContain(`ansi = ["${p.ansi[0]}"`);
+  expect(w).toContain(`"${p.ansi[7]}"]`);
+  expect(w).toContain(`brights = ["${p.ansi[8]}"`);
+  const wa = toWarp(sop);
+  expect(wa).toContain('details: "darker"');
+  expect(wa).toContain(`black: "${p.ansi[0]}"`);
+  expect(wa).toContain(`white: "${p.ansi[15]}"`);
 });
 
 test("slugify + discover: labels normalize, local themes are found", () => {

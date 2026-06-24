@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> opencode theme JSON (its semantic schema, direct hex per role).
 import type { VscodeTheme } from "../load.ts";
 import { pick, stripAlpha, flattenAlpha } from "../load.ts";
@@ -47,3 +48,16 @@ export function toOpencode(theme: VscodeTheme): string {
   };
   return JSON.stringify({ $schema: "https://opencode.ai/theme.json", theme: theme_ }, null, 2) + "\n";
 }
+
+export default defineTarget({
+  name: "opencode",
+  detect: (c) => c.has(c.config("opencode")),
+  build: (c) => {
+    c.write(c.config("opencode", "themes", "monotheme.json"), toOpencode(c.theme));
+    c.setJson(c.config("opencode", "tui.json"), "theme", "monotheme");
+    // SIGUSR2 hot-reloads the TUI; `opencode serve` has no handler (the signal would
+    // kill it), so signal only non-serve processes.
+    c.run(`for p in $(pgrep -x opencode 2>/dev/null); do case "$(ps -o args= -p $p 2>/dev/null)" in *serve*) ;; *) kill -USR2 $p 2>/dev/null ;; esac; done; true`);
+    return "themes/monotheme.json (SIGUSR2 live-reload)";
+  },
+});

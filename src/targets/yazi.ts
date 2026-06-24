@@ -1,3 +1,5 @@
+import { toTmTheme } from "../formats/tmtheme.ts";
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> yazi flavor.toml (UI). Syntax preview is the tmtheme.xml,
 // generated separately via the shared tmTheme adapter.
 import type { VscodeTheme } from "../load.ts";
@@ -79,3 +81,19 @@ hovered = ${on(p.fg, p.selection, ", bold = true")}
 footer  = ${on(p.fgMuted, p.bgPanel)}
 `;
 }
+
+export default defineTarget({
+  name: "yazi",
+  detect: (c) => c.has(c.config("yazi")),
+  build: (c) => {
+    c.write(c.config("yazi", "flavors", "monotheme.yazi", "flavor.toml"), toYaziFlavor(c.theme));
+    c.write(c.config("yazi", "flavors", "monotheme.yazi", "tmtheme.xml"), toTmTheme(c.theme, { name: "Monotheme" }));
+    const tt = c.config("yazi", "theme.toml");
+    let s = c.read(tt);
+    if (s) {
+      s = s.replace(/(\bdark\s*=\s*)"[^"]*"/, `$1"monotheme"`).replace(/(\blight\s*=\s*)"[^"]*"/, `$1"monotheme"`);
+      c.write(tt, s);
+    }
+    return "flavors/monotheme.yazi (relaunch to apply)";
+  },
+});

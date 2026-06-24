@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> btop .theme file (42 keys: base UI + 3-stop gradients).
 import type { VscodeTheme } from "../load.ts";
 import { project } from "../project.ts";
@@ -39,3 +40,11 @@ export function toBtop(theme: VscodeTheme): string {
   ];
   return lines.join("\n") + "\n";
 }
+
+export default defineTarget({
+  name: "btop",
+  // btop.conf pins color_theme = "monotheme"; we overwrite that slot. SIGUSR2 reloads.
+  file: (c) => c.config("btop", "themes", "monotheme.theme"),
+  render: (c) => toBtop(c.theme),
+  reload: () => "pkill -USR2 -x btop",
+});

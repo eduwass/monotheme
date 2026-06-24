@@ -1,4 +1,6 @@
-// VSCode theme -> a complete nvim colorscheme (colors/dotfiles.lua). Editor/UI
+import { toVscodeTheme, toVscodeThemeManifest, labelFor } from "../formats/vscode-theme.ts";
+import { defineTarget } from "../target-kit.ts";
+// VSCode theme -> a complete nvim colorscheme (colors/monotheme.lua). Editor/UI
 // chrome comes from the projection role set; syntax + treesitter highlighting is
 // resolved straight from the theme's tokenColors[] (the same data shiki/VSCode
 // read) via resolveToken, so a given token kind gets the color AND font style
@@ -162,7 +164,7 @@ export function toNvim(theme: VscodeTheme): string {
 vim.o.background = "${theme.type}"
 vim.cmd("highlight clear")
 if vim.fn.exists("syntax_on") then vim.cmd("syntax reset") end
-vim.g.colors_name = "dotfiles"
+vim.g.colors_name = "monotheme"
 ${term}
 
 local hl = function(group, opts) vim.api.nvim_set_hl(0, group, opts) end
@@ -236,3 +238,21 @@ ${hl("WhichKeyDesc", { fg: c.fg })}
 ${hl("WhichKeyFloat", { bg: c.panel })}
 `;
 }
+
+export default defineTarget({
+  name: "nvim",
+  detect: (c) => c.hasCmd("nvim"),
+  // (1) chrome colorscheme colors/monotheme.lua  (2) a self-contained VSCode theme for
+  // nvim-textmate (true TextMate syntax parity), under a per-theme label that cache-busts
+  // the plugin's by-name cache. Then live-reload running nvims over their sockets:
+  // TxMtTheme first (sets its own bg), our colorscheme last so our bg wins.
+  build: (c) => {
+    c.write(c.config("nvim", "colors", "monotheme.lua"), toNvim(c.theme));
+    const label = labelFor(c.theme);
+    c.write(c.config("nvim", "tm-extensions", "monotheme", "package.json"), toVscodeThemeManifest(c.theme));
+    c.write(c.config("nvim", "tm-extensions", "monotheme", "themes", "monotheme.json"), toVscodeTheme(c.theme));
+    c.write(c.config("nvim", "tm-extensions", "monotheme", "current.txt"), label + "\n");
+    c.run(`for s in "$XDG_RUNTIME_DIR"/nvim.*.0 "\${TMPDIR:-/tmp}"/nvim.*/*/nvim.*.0 /tmp/nvim*/*.0; do [ -S "$s" ] && nvim --server "$s" --remote-send '<C-\\><C-N>:silent! TxMtTheme ${label}<CR>:colorscheme monotheme<CR>' 2>/dev/null; done; true`);
+    return `colors/monotheme.lua + tm-extensions (${label})`;
+  },
+});

@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> Ghostty theme file (palette 0..15 + bg/fg/cursor/selection).
 import type { VscodeTheme } from "../load.ts";
 import { project } from "../project.ts";
@@ -15,3 +16,15 @@ export function toGhostty(theme: VscodeTheme): string {
   ];
   return lines.join("\n") + "\n";
 }
+
+export default defineTarget({
+  name: "ghostty",
+  // config pins `theme = monotheme`; we overwrite that slot.
+  file: (c) => c.config("ghostty", "themes", c.slot),
+  render: (c) => toGhostty(c.theme),
+  // macOS ghostty isn't auto-watched (ghostty#3643) → AppleScript reload; Linux → SIGUSR2.
+  reload: (c) =>
+    c.mac
+      ? `osascript -e 'tell application "Ghostty" to perform action "reload_config" on terminal 1'`
+      : "pkill -USR2 -x ghostty",
+});

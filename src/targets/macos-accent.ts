@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // Map a theme's accent to the nearest macOS system accent preset (no custom hex
 // API exists — macOS only has 8 presets). Drives `defaults write -g AppleAccentColor`.
 import type { VscodeTheme } from "../load.ts";
@@ -35,3 +36,15 @@ export function nearestAccent(theme: VscodeTheme): Preset {
   }
   return best;
 }
+
+export default defineTarget({
+  name: "macos-accent",
+  // no custom-hex API; snap to the nearest of macOS's 8 accent presets.
+  detect: (c) => c.mac,
+  build: (c) => {
+    const a = nearestAccent(c.theme);
+    c.run(`defaults write -g AppleAccentColor -int ${a.int}`);
+    c.run(`defaults write -g AppleHighlightColor -string ${JSON.stringify(a.highlight)}`);
+    return `${a.name} (nearest preset; relaunch apps to fully apply)`;
+  },
+});

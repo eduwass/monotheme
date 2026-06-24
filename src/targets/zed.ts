@@ -1,9 +1,10 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> Zed theme family JSON (style + syntax map). Zed watches
-// ~/.config/zed/themes/ and hot-reloads. We pin a stable theme name "Dotfiles".
+// ~/.config/zed/themes/ and hot-reloads. We pin a stable theme name "Monotheme".
 import type { VscodeTheme } from "../load.ts";
 import { project, scopeColor, resolveToken } from "../project.ts";
 
-export const ZED_THEME_NAME = "Dotfiles";
+export const ZED_THEME_NAME = "Monotheme";
 
 export function toZed(theme: VscodeTheme): string {
   const p = project(theme);
@@ -131,3 +132,14 @@ export function toZed(theme: VscodeTheme): string {
   };
   return JSON.stringify(family, null, 2) + "\n";
 }
+
+export default defineTarget({
+  name: "zed",
+  // Zed watches its themes/ dir and hot-reloads; point settings.theme at our slot.
+  build: (c) => {
+    c.write(c.config("zed", "themes", "monotheme.json"), toZed(c.theme));
+    return c.setJson(c.config("zed", "settings.json"), "theme", ZED_THEME_NAME)
+      ? `theme = ${ZED_THEME_NAME}`
+      : "no settings.json";
+  },
+});

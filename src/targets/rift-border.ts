@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> rift overlay accent colors (focus border + cursor halo + halo fx).
 // The custom renderer (scripts/mac/rift/focus-border-renderer.swift) reads its
 // config from ~/.local/state/rift/ui.json and WATCHES the file, hot-reloading
@@ -29,3 +30,18 @@ export function withRiftColors(ui: Record<string, unknown>, accent: string): Rec
     halo: { ...halo, color: accent, fx: { ...fx, color: accent } },
   };
 }
+
+export default defineTarget({
+  name: "rift-border",
+  // Mac-only custom WM overlays (focus border + cursor halo + halo fx). The renderer
+  // watches ui.json and reloads — a merge-write of the color keys is enough.
+  detect: (c) => c.mac && c.has(c.home(".local", "state", "rift", "ui.json")),
+  build: (c) => {
+    const ui = c.home(".local", "state", "rift", "ui.json");
+    let obj: Record<string, unknown> = {};
+    try { obj = JSON.parse(c.read(ui) || "{}"); } catch {}
+    const color = riftBorderColor(c.theme);
+    c.write(ui, JSON.stringify(withRiftColors(obj, color), null, 2) + "\n");
+    return `border + halo + fx color = ${color}`;
+  },
+});

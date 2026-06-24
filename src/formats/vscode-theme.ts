@@ -1,5 +1,5 @@
 // Re-emit the active theme as a self-contained VSCode color theme named
-// "Dotfiles", plus the minimal extension manifest nvim-textmate needs to load it.
+// "Monotheme", plus the minimal extension manifest nvim-textmate needs to load it.
 // Feeding nvim-textmate OUR slot (instead of pointing it at raw editor extensions)
 // avoids per-theme quirks: multi-variant naming ("GitHub Light" vs "GitHub Light
 // Default"), include resolution, etc. We control one stable name.
@@ -7,10 +7,10 @@ import type { VscodeTheme, TokenColor } from "../load.ts";
 import { stripAlpha } from "../load.ts";
 
 // nvim-textmate's C module caches parsed themes BY NAME, and exposes no reload —
-// so a stable name ("Dotfiles") never re-reads the rewritten file on switch
+// so a stable name ("Monotheme") never re-reads the rewritten file on switch
 // (dark↔light breaks). Register each theme under its OWN name instead: a real
 // switch is then always a cache miss → fresh read.
-export const labelFor = (theme: VscodeTheme) => `Dotfiles ${theme.name}`;
+export const labelFor = (theme: VscodeTheme) => `Monotheme ${theme.name}`;
 
 // nvim-textmate's C color parser wants #rrggbb — normalize #rgb shorthand / alpha
 // (raw editor themes like github-light use "#fff", which renders as black).
@@ -42,12 +42,12 @@ export function toVscodeTheme(theme: VscodeTheme): string {
 export function toVscodeThemeManifest(theme: VscodeTheme): string {
   return JSON.stringify(
     {
-      name: "dotfiles-theme",
+      name: "monotheme-theme",
       version: "1.0.0",
       engines: { vscode: "*" },
       contributes: {
         themes: [
-          { label: labelFor(theme), uiTheme: theme.type === "light" ? "vs" : "vs-dark", path: "./themes/dotfiles.json" },
+          { label: labelFor(theme), uiTheme: theme.type === "light" ? "vs" : "vs-dark", path: "./themes/monotheme.json" },
         ],
       },
     },

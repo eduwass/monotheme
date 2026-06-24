@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> herdr [theme.custom] block (Catppuccin-style palette).
 // https://herdr.dev/docs/preview/configuration/#theme
 // herdr expects a readable ladder of muted tones (overlay0 < overlay1 < subtext0),
@@ -31,3 +32,18 @@ peach       = "${p.warning}"
 red         = "${p.error}"
 `;
 }
+
+export default defineTarget({
+  name: "herdr",
+  detect: (c) => c.has(c.config("herdr", "config.toml")),
+  build: (c) => {
+    const conf = c.config("herdr", "config.toml");
+    let s = c.read(conf);
+    s = /\[theme\.custom\]/.test(s)
+      ? s.replace(/\[theme\.custom\][\s\S]*$/, toHerdrTheme(c.theme))
+      : s + "\n" + toHerdrTheme(c.theme);
+    c.write(conf, s);
+    c.run("herdr server reload-config");
+    return "[theme.custom] (reload-config)";
+  },
+});

@@ -1,9 +1,10 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> Claude Code theme JSON ({name, base, overrides}).
 import type { VscodeTheme } from "../load.ts";
 import { pick, stripAlpha } from "../load.ts";
 import { project } from "../project.ts";
 
-export const CLAUDE_THEME_NAME = "Dotfiles";
+export const CLAUDE_THEME_NAME = "Monotheme";
 
 export function toClaude(theme: VscodeTheme): string {
   const p = project(theme);
@@ -31,3 +32,13 @@ export function toClaude(theme: VscodeTheme): string {
   };
   return JSON.stringify({ name: CLAUDE_THEME_NAME, base: theme.type, overrides }, null, 2) + "\n";
 }
+
+export default defineTarget({
+  name: "claude",
+  detect: (c) => c.has(c.home(".claude")),
+  build: (c) => {
+    c.write(c.home(".claude", "themes", "monotheme.json"), toClaude(c.theme));
+    c.setJson(c.home(".claude", "settings.json"), "theme", `custom:${CLAUDE_THEME_NAME.toLowerCase()}`);
+    return "themes/monotheme.json (restart to apply)";
+  },
+});

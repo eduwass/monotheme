@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // base16 scheme -> fzf --color opts (sourced as FZF_DEFAULT_OPTS). Proof that any
 // base16-templated tool can be driven from our projected scheme.
 import type { VscodeTheme } from "../load.ts";
@@ -15,3 +16,11 @@ export function toFzf(theme: VscodeTheme): string {
 export FZF_DEFAULT_OPTS="\${FZF_DEFAULT_OPTS:-} --color=${color}"
 `;
 }
+
+export default defineTarget({
+  name: "fzf",
+  detect: (c) => c.hasCmd("fzf"),
+  // sourced from your shell rc as FZF_DEFAULT_OPTS; next shell/fzf picks it up.
+  file: (c) => c.config("fzf", "theme.sh"),
+  render: (c) => toFzf(c.theme),
+});

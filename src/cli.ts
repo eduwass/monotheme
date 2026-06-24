@@ -6,16 +6,18 @@
 //   theme init                 re-apply the active theme (run from shell rc)
 //   theme raycast              open the active theme as a Raycast import (one click)
 //   theme check                self-check (no writes)
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { loadTheme, stripAlpha } from "./load.ts";
 import { project } from "./project.ts";
 import { discover, resolveTheme, slugify } from "./discover.ts";
-import { TARGETS, peerThemeCommand } from "./targets.ts";
-import { toTmTheme } from "./adapters/tmtheme.ts";
-import { toGhostty } from "./adapters/ghostty.ts";
-import { raycastImportUrl } from "./adapters/raycast.ts";
+import { TARGETS } from "./registry.ts";
+import { peerThemeCommand } from "./sync.ts";
+import { makeCtx, applyTarget } from "./target-kit.ts";
+import { toTmTheme } from "./formats/tmtheme.ts";
+import { toGhostty } from "./targets/ghostty.ts";
+import { raycastImportUrl } from "./formats/raycast.ts";
 
 const STATE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".state");
 // the full resolved theme that's currently active — the portable unit we sync to
@@ -42,21 +44,10 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
   const p = project(theme);
   if (p.warnings.length && !opSilent) for (const w of p.warnings) console.warn(`  ! ${w}`);
 
+  const ctx = makeCtx(theme, p, entry);
   for (const t of TARGETS) {
-    if (t.mode === "manual") { if (!opSilent) console.log(`  - ${t.name} (manual, skipped)`); continue; }
-    if (t.detect && !t.detect()) { if (!opSilent) console.log(`  · ${t.name} (not on this machine)`); continue; }
-    if (t.apply) {
-      let status: string;
-      try { status = t.apply({ theme, entry }); } catch (e) { status = `${t.name} (error: ${(e as Error).message})`; }
-      if (!opSilent) console.log(`  ✓ ${status}`);
-      continue;
-    }
-    if (!t.dest || !t.render) continue;
-    const dest = t.dest(theme);
-    mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, t.render(theme));
-    if (t.reload) { try { execSync(t.reload(theme), { stdio: "ignore" }); } catch {} }
-    if (!opSilent) console.log(`  ✓ ${t.name} → ${dest.replace(process.env.HOME ?? "", "~")}`);
+    const r = applyTarget(t, ctx);
+    if (!opSilent) console.log(`  ${r.present ? (r.ok ? "✓" : "✗") : "·"} ${r.status}`);
   }
   writeFileSync(STATE, entry.slug + "\n");
   // canonical = the fully-resolved theme; portable across machines.

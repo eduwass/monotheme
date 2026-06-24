@@ -1,7 +1,8 @@
 # Contributing
 
-The highest-leverage contribution is a **new tool adapter** — see
-[`docs/ADAPTERS.md`](docs/ADAPTERS.md). Theme one tool and everyone gets it.
+The highest-leverage contribution is **support for a new tool** — and it's one file:
+copy `src/targets/_template.ts`, fill it in, done (it's auto-discovered, nothing to
+register). See [`docs/ADAPTERS.md`](docs/ADAPTERS.md). Theme one tool, everyone gets it.
 
 ## Setup
 
@@ -13,8 +14,9 @@ bun test                     # unit tests + shiki syntax-parity oracle
 
 ## Ground rules
 
-- **Pure adapters.** A `to*(theme)` function returns a string/object; all IO and
-  reload logic lives in `src/targets.ts`. Adapters stay trivially testable.
+- **One file per tool** in `src/targets/`. Keep the format function pure (theme →
+  string); the engine does the IO and reload via the context `c`, so targets stay
+  testable and you never hardcode an OS-specific path.
 - **Verify syntax against shiki.** If your tool consumes TextMate/shiki-style
   themes, add cases to `test/shiki-parity.test.ts` so colors are checked
   token-for-token against the reference highlighter.

@@ -1,3 +1,4 @@
+import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> lazygit gui.theme block (YAML fragment, 4-space indented to sit
 // under `gui:`). lazygit colors are hex strings (optionally with style modifiers).
 // https://github.com/jesseduffield/lazygit/blob/master/docs/Config.md#color-attributes
@@ -33,3 +34,12 @@ export function toLazygit(theme: VscodeTheme): string {
       - "${p.bgPanel}"
 `;
 }
+
+export default defineTarget({
+  name: "lazygit",
+  detect: (c) => c.has(c.config("lazygit", "config.yml")),
+  // Standalone slot; merge it last via LG_CONFIG_FILE (config.yml:theme.yml) so the
+  // tracked config never churns. Applies next launch — no live reload.
+  file: (c) => c.config("lazygit", "theme.yml"),
+  render: (c) => toLazygit(c.theme),
+});
