@@ -112,6 +112,22 @@ test("zed: valid theme family with style + syntax + ansi", () => {
   expect(syn["variable.member"].color).toBe("#9EFFFF"); // treesitter can't split keys/access — cyan
 });
 
+test("sublime: valid color-scheme JSON with globals + TextMate rules", () => {
+  const { toSublime } = require("../src/targets/sublime.ts");
+  const s = JSON.parse(toSublime(sop, { name: "Monotheme" }));
+  expect(s.name).toBe("Monotheme");
+  expect(s.globals.background).toBe("#2D2B55"); // editor.background
+  expect(s.globals.foreground).toBe("#FFFFFF");
+  expect(Array.isArray(s.rules)).toBe(true);
+  // a comment rule carries its scope + foreground (TextMate scope model)
+  const comment = s.rules.find((r: any) => /comment/.test(r.scope ?? ""));
+  expect(comment).toBeTruthy();
+  expect(comment.foreground).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  // fontStyle "italic" maps to Sublime's font_style (normal/empty dropped)
+  expect(s.rules.some((r: any) => r.font_style === "italic")).toBe(true);
+  expect(s.rules.every((r: any) => r.font_style !== "normal")).toBe(true);
+});
+
 test("patchJsonStringKey: replaces existing key, inserts missing, preserves rest", () => {
   const { patchJsonStringKey } = require("../src/util.ts");
   const { writeFileSync, readFileSync, mkdtempSync } = require("node:fs");
