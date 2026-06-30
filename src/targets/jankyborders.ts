@@ -12,7 +12,7 @@ import { project } from "../project.ts";
 //
 // JankyBorders wants 8-digit 0xAARRGGBB; the theme accent is 6-digit "#RRGGBB":
 //   active_color   = accent @ full alpha  (focused window)
-//   inactive_color = accent @ ~50% alpha  (unfocused windows — themed but dimmed)
+//   inactive_color = fully transparent    (unfocused windows get NO border, by preference)
 export default defineTarget({
   name: "jankyborders",
   // Mac-only: JankyBorders is a macOS tool; its config lives at ~/.config/borders/bordersrc.
@@ -21,7 +21,7 @@ export default defineTarget({
     const rc = c.config("borders", "bordersrc");
     const rgb = stripAlpha(project(c.theme).accent).replace(/^#/, "").toLowerCase();
     const active = `0xff${rgb}`;
-    const inactive = `0x80${rgb}`;
+    const inactive = `0x00000000`; // no border on unfocused windows
     const text = (c.read(rc) || "")
       .replace(/active_color=0x[0-9a-fA-F]{8}/, `active_color=${active}`)
       .replace(/inactive_color=0x[0-9a-fA-F]{8}/, `inactive_color=${inactive}`);
