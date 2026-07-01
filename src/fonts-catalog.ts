@@ -58,6 +58,7 @@ export function catalogWithStatus() {
       ...f,
       installed: nfInstalled || isFamilyInstalled(f.name),
       hasNerdFont: !!f.nerdFont,
+      nerdInstalled: nfInstalled, // the Nerd Font *patched* build specifically is present
       setFamily: f.nerdFont && nfInstalled ? f.nerdFont : f.name,
     };
   });
