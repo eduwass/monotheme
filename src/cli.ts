@@ -160,6 +160,35 @@ switch (cmd) {
     console.log(`\nsynced ${n} theme(s) → ${USER_THEMES.replace(process.env.HOME || "~", "~")}`);
     break;
   }
+  case "browse": {
+    // search the VS Code Marketplace for themes (the source vscodethemes.com indexes)
+    const q = rest.filter((r) => !r.startsWith("--")).join(" ");
+    if (!q) { console.error('usage: theme browse "<query>"   then: theme add <publisher.extension>'); process.exit(1); }
+    const { searchThemes } = await import("./market.ts");
+    try {
+      const hits = await searchThemes(q);
+      if (rest.includes("--json")) { console.log(JSON.stringify(hits)); break; }
+      if (!hits.length) { console.log(`no theme extensions match '${q}'`); break; }
+      for (const h of hits) {
+        console.log(`  ${h.id.padEnd(42)} ${(h.installs.toLocaleString() + " installs").padStart(16)}  ${h.displayName}`);
+      }
+      console.log(`\nadd one with:  theme add <publisher.extension>`);
+    } catch (e) { console.error(`theme browse: ${(e as Error).message}`); process.exit(1); }
+    break;
+  }
+  case "add": {
+    const id = rest.find((r) => !r.startsWith("--"));
+    if (!id) { console.error("usage: theme add <publisher.extension>   (find ids via: theme browse <query>)"); process.exit(1); }
+    const { addExtension } = await import("./market.ts");
+    try {
+      console.log(`fetching ${id}…`);
+      const { added, label } = await addExtension(id);
+      for (const s of added) console.log(`  ✓ ${s}`);
+      console.log(`\nadded ${added.length} theme(s) from ${label} → ~/.config/monotheme/themes/`);
+      console.log(`set one with:  theme set ${added[0]}`);
+    } catch (e) { console.error(`theme add: ${(e as Error).message}`); process.exit(1); }
+    break;
+  }
   case "font": {
     runFont(rest);
     break;
@@ -169,7 +198,7 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("usage: theme <list|set|current|init|sync|font|raycast|check> [name]");
+    console.log("usage: theme <list|set|current|init|sync|browse|add|font|raycast|check> [name]");
     process.exit(cmd ? 1 : 0);
 }
 
