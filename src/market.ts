@@ -4,7 +4,7 @@
 // contributes, and vendors them into the config-home themes/ dir so they show up
 // in `theme list` and can be `theme set` like any other.
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import JSON5 from "json5";
@@ -73,9 +73,12 @@ function loadThemeFile(path: string): { colors: any; tokenColors: any[]; type?: 
   };
 }
 
-/** Download an extension's .vsix, extract every theme it contributes, and vendor
- *  them into the config-home themes/ dir. Returns the slugs added. */
-export async function addExtension(pubExt: string): Promise<{ added: string[]; label: string }> {
+export interface ExtractedTheme { slug: string; name: string; type: "dark" | "light"; colors: any; tokenColors: any[]; }
+
+/** Download an extension's .vsix and extract every theme it contributes as an
+ *  in-memory object — WITHOUT vendoring. Shared by `add` (which writes them) and
+ *  the remote preview (which just renders one). */
+export async function fetchExtensionThemes(pubExt: string): Promise<{ label: string; themes: ExtractedTheme[] }> {
   const m = /^([^.]+)\.(.+)$/.exec(pubExt);
   if (!m) throw new Error(`expected <publisher.extension>, got '${pubExt}'`);
   const [, publisher, extension] = m;
@@ -101,22 +104,31 @@ export async function addExtension(pubExt: string): Promise<{ added: string[]; l
     const themes = pkg?.contributes?.themes;
     if (!Array.isArray(themes) || !themes.length) throw new Error(`${pubExt} contributes no themes`);
 
-    mkdirSync(USER_THEMES, { recursive: true });
-    const added: string[] = [];
+    const out: ExtractedTheme[] = [];
     for (const th of themes) {
       if (!th?.path) continue;
       const tp = resolve(join(tmp, "extension"), th.path);
       if (!existsSync(tp)) continue;
       const label = th.label ?? th.id ?? th.path;
       const resolved = loadThemeFile(tp);
-      const type = resolved.type ?? uiToType(th.uiTheme);
-      const slug = slugify(label);
-      const out = { name: label, type, colors: resolved.colors, tokenColors: resolved.tokenColors };
-      writeFileSync(join(USER_THEMES, slug + ".json"), JSON.stringify(out, null, 2) + "\n");
-      added.push(slug);
+      out.push({ slug: slugify(label), name: label, type: resolved.type ?? uiToType(th.uiTheme), colors: resolved.colors, tokenColors: resolved.tokenColors });
     }
-    return { added, label: pkg.displayName ?? pubExt };
+    return { label: pkg.displayName ?? pubExt, themes: out };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
+}
+
+/** Download an extension's .vsix, extract every theme it contributes, and vendor
+ *  them into the config-home themes/ dir. Returns the slugs added. */
+export async function addExtension(pubExt: string): Promise<{ added: string[]; label: string }> {
+  const { label, themes } = await fetchExtensionThemes(pubExt);
+  mkdirSync(USER_THEMES, { recursive: true });
+  const added: string[] = [];
+  for (const t of themes) {
+    const out = { name: t.name, type: t.type, colors: t.colors, tokenColors: t.tokenColors };
+    writeFileSync(join(USER_THEMES, t.slug + ".json"), JSON.stringify(out, null, 2) + "\n");
+    added.push(t.slug);
+  }
+  return { added, label };
 }

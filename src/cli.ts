@@ -22,6 +22,7 @@ import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, migrateCon
 import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
 import { catalogWithStatus, findFont, installFont, resolveFamily } from "./fonts-catalog.ts";
 import { toPreviewSvg } from "./preview.ts";
+import { dominantColor } from "./color.ts";
 import JSON5 from "json5";
 
 // One-time move of legacy clone-root state into ~/.config/monotheme/ (no-op after),
@@ -95,7 +96,18 @@ switch (cmd) {
   case "list": {
     const json = rest.includes("--json");
     const all = discover();
-    if (json) { console.log(JSON.stringify(all, null, 2)); break; }
+    if (json) {
+      // enrich with each theme's dominant colour so the picker can browse by hue.
+      const enriched = all.map((e) => {
+        try {
+          const t = loadTheme(e.path); t.type = e.appearance as "dark" | "light";
+          const d = dominantColor(t);
+          return { ...e, accent: d.hex, hue: d.hue };
+        } catch { return { ...e, accent: null, hue: "mono" as const }; }
+      });
+      console.log(JSON.stringify(enriched, null, 2));
+      break;
+    }
     const cur = existsSync(STATE) ? readFileSync(STATE, "utf8").trim() : "";
     for (const e of all) {
       const mark = e.slug === cur ? "*" : " ";
@@ -167,6 +179,29 @@ switch (cmd) {
     // theme will actually look in your setup.
     const cf = loadFonts();
     const curFont = resolveFont(cf, "editor").family ?? resolveFont(cf, "mono").family;
+    // --remote <publisher.extension>: preview a Marketplace theme WITHOUT installing
+    // it — downloads the .vsix, renders our own faithful card. Cached under
+    // previews/remote/ so it's a one-time download per theme (parity with fonts).
+    if (rest.includes("--remote")) {
+      const id = rest.find((r) => !r.startsWith("--"));
+      if (!id) { console.error('usage: theme preview <publisher.extension> --remote   (ids via: theme browse)'); process.exit(1); }
+      const rdir = join(CONFIG_HOME, "previews", "remote");
+      const cache = join(rdir, slugify(id) + ".svg");
+      let svg: string;
+      if (existsSync(cache)) svg = readFileSync(cache, "utf8");
+      else {
+        const { fetchExtensionThemes } = await import("./market.ts");
+        const { themes } = await fetchExtensionThemes(id);
+        if (!themes.length) { console.error(`theme preview: ${id} contributes no themes`); process.exit(1); }
+        const th = themes[0];
+        svg = toPreviewSvg({ name: th.name, type: th.type, colors: th.colors, tokenColors: th.tokenColors } as any, { fontFamily: curFont });
+        mkdirSync(rdir, { recursive: true });
+        writeFileSync(cache, svg);
+      }
+      if (rest.includes("--stdout")) { process.stdout.write(svg); break; }
+      console.log(cache);
+      break;
+    }
     const arg = rest.find((r) => !r.startsWith("--"));
     let theme;
     if (arg) {
