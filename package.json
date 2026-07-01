@@ -26,7 +26,9 @@
   },
   "scripts": {
     "check": "bun run src/cli.ts check",
-    "test": "bun test"
+    "test": "bun test",
+    "embed": "bun scripts/embed-themes.ts",
+    "build:binary": "bun scripts/embed-themes.ts && bun scripts/embed-targets.ts && bun build --compile src/cli.ts --outfile dist/theme"
   },
   "dependencies": {
     "json5": "^2.2.3",

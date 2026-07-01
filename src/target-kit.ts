@@ -11,6 +11,7 @@ import type { VscodeTheme } from "./load.ts";
 import type { Projection } from "./project.ts";
 import type { ThemeEntry } from "./discover.ts";
 import { patchJsonStringKey } from "./util.ts";
+import { resolveFont, type FontsConfig, type FontRole, type FontSpec } from "./fonts.ts";
 
 export type OS = "mac" | "linux" | "win";
 
@@ -57,8 +58,13 @@ export interface Ctx {
   read(path: string): string;
   /** run a shell command; errors are swallowed (so an absent app is a no-op). */
   run(cmd: string): void;
-  /** set one JSON string key in place (preserves the rest of the file). */
-  setJson(file: string, key: string, value: string): boolean;
+  /** set one top-level JSON key (string or number) in place (preserves the rest). */
+  setJson(file: string, key: string, value: string | number): boolean;
+
+  // --- fonts (orthogonal axis; empty {} when fonts.json is absent → no-op) ---
+  /** resolve a font role to { family?, size? } with mono-fallback. Returns {}
+   *  when fonts are unconfigured, so targets naturally write nothing. */
+  font(role: FontRole): FontSpec;
 }
 
 /** A target = how to theme one tool. Pick ONE of two shapes:
@@ -102,7 +108,7 @@ const HOME = homedir();
 const osOf = (): OS => (process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux");
 
 /** Build the context for one theme application. */
-export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, slot = "monotheme"): Ctx {
+export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, fonts: FontsConfig | null = null, slot = "monotheme"): Ctx {
   const os = osOf();
   const cfgRoot = process.env.XDG_CONFIG_HOME || (os === "win" ? process.env.APPDATA || join(HOME, "AppData", "Roaming") : join(HOME, ".config"));
   const dataRoot = process.env.XDG_DATA_HOME || (os === "win" ? process.env.LOCALAPPDATA || join(HOME, "AppData", "Local") : join(HOME, ".local", "share"));
@@ -120,6 +126,7 @@ export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEnt
     read: (path) => { try { return readFileSync(path, "utf8"); } catch { return ""; } },
     run: (cmd) => { try { execSync(cmd, { stdio: "ignore" }); } catch {} },
     setJson: (file, key, value) => patchJsonStringKey(file, key, value),
+    font: (role) => resolveFont(fonts, role),
   };
 }
 

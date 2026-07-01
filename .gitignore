@@ -1,3 +1,9 @@
 node_modules/
+# legacy clone-root state (now lives in ~/.config/monotheme/; kept ignored so an
+# old build can't dirty the tree)
 .state
 .active.json
+# compiled binary + generated build artifacts (reproducible via `bun run build:binary`)
+dist/
+src/embedded-themes.gen.ts
+src/targets.gen.ts

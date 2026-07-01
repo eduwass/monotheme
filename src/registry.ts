@@ -8,15 +8,22 @@ import type { Target } from "./target-kit.ts";
 
 const dir = join(dirname(new URL(import.meta.url).pathname), "targets");
 
-const files = readdirSync(dir)
-  .filter((f) => f.endsWith(".ts") && !f.startsWith("_"))
-  .sort();
-
-const mods = await Promise.all(files.map((f) => import(join(dir, f))));
-
-export const TARGETS: Target[] = mods
-  .map((m, i) => {
+// Dev: auto-discover targets from disk (drop a file in src/targets/ and it works).
+// Compiled binary: there's no targets/ dir on disk, so fall back to the generated
+// static manifest (scripts/embed-targets.ts, produced by `bun run build:binary`).
+async function loadTargets(): Promise<Target[]> {
+  let files: string[];
+  try {
+    files = readdirSync(dir).filter((f) => f.endsWith(".ts") && !f.startsWith("_")).sort();
+  } catch {
+    return (await import("./targets.gen.ts")).GEN_TARGETS;
+  }
+  const mods = await Promise.all(files.map((f) => import(join(dir, f))));
+  return mods.map((m, i) => {
     const t = m.default as Target | undefined;
     if (!t) throw new Error(`targets/${files[i]} must \`export default defineTarget({...})\``);
     return t;
   });
+}
+
+export const TARGETS: Target[] = await loadTargets();

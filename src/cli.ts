@@ -6,8 +6,8 @@
 //   theme init                 re-apply the active theme (run from shell rc)
 //   theme raycast              open the active theme as a Raycast import (one click)
 //   theme check                self-check (no writes)
-import { writeFileSync, readFileSync, existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { loadTheme, stripAlpha } from "./load.ts";
 import { project } from "./project.ts";
@@ -18,11 +18,14 @@ import { makeCtx, applyTarget } from "./target-kit.ts";
 import { toTmTheme } from "./formats/tmtheme.ts";
 import { toGhostty } from "./targets/ghostty.ts";
 import { raycastImportUrl } from "./formats/raycast.ts";
+import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, migrateConfigHome, hydrateDefaults } from "./paths.ts";
+import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
+import JSON5 from "json5";
 
-const STATE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".state");
-// the full resolved theme that's currently active — the portable unit we sync to
-// the peer (which may not have the same themes installed) and re-apply on init.
-const ACTIVE = resolve(dirname(new URL(import.meta.url).pathname), "..", ".active.json");
+// One-time move of legacy clone-root state into ~/.config/monotheme/ (no-op after),
+// and, in a compiled binary, materialise the embedded default themes.
+migrateConfigHome();
+await hydrateDefaults();
 const [cmd, ...rest] = process.argv.slice(2);
 
 // Resolve a `theme set` argument: a theme name/slug, OR a path to a theme JSON
@@ -44,26 +47,28 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
   const p = project(theme);
   if (p.warnings.length && !opSilent) for (const w of p.warnings) console.warn(`  ! ${w}`);
 
-  const ctx = makeCtx(theme, p, entry);
+  const ctx = makeCtx(theme, p, entry, loadFonts());
   for (const t of TARGETS) {
     const r = applyTarget(t, ctx);
     if (!opSilent) console.log(`  ${r.present ? (r.ok ? "✓" : "✗") : "·"} ${r.status}`);
   }
+  mkdirSync(CONFIG_HOME, { recursive: true });
   writeFileSync(STATE, entry.slug + "\n");
   // canonical = the fully-resolved theme; portable across machines.
   const canonical = JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors });
   writeFileSync(ACTIVE, canonical + "\n");
-  // vendor editor-sourced themes into the repo's tracked themes/ dir so they're
-  // version-controlled and discoverable on every machine (e.g. servers with no
-  // editor extensions installed). idempotent.
+  // vendor editor-sourced themes into the config-home themes/ dir so they're
+  // discoverable on every machine (e.g. servers with no editor extensions
+  // installed) and available even once monotheme is a standalone binary.
   // Only vendor ONCE (when missing) — rewriting on every switch reserializes the
-  // file, stripping authored comments and reordering keys, which churns the repo
-  // on each theme change. A present vendored copy is already the source of truth.
+  // file, stripping authored comments and reordering keys. A present vendored
+  // copy is already the source of truth.
   if (entry.source !== "local" && entry.source !== "file") {
-    const vendored = resolve(dirname(new URL(import.meta.url).pathname), "..", "themes", entry.slug + ".json");
+    const vendored = join(USER_THEMES, entry.slug + ".json");
     if (!existsSync(vendored)) {
+      mkdirSync(USER_THEMES, { recursive: true });
       writeFileSync(vendored, JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors }, null, 2) + "\n");
-      if (!opSilent) console.log(`  ✓ vendored → themes/${entry.slug}.json (commit to track)`);
+      if (!opSilent) console.log(`  ✓ vendored → ${vendored.replace(process.env.HOME || "~", "~")}`);
     }
   }
   if (!opSilent) console.log(`\nset: ${theme.name} (${theme.type})`);
@@ -133,18 +138,104 @@ switch (cmd) {
     catch { console.log(`raycast: open this to import:\n  ${url}`); }
     break;
   }
+  case "sync": {
+    // Eagerly vendor every discovered editor theme into the config-home themes/
+    // dir, so they're available offline and on a headless peer without having to
+    // `set` each one first. Idempotent: skips ones already vendored.
+    mkdirSync(USER_THEMES, { recursive: true });
+    let n = 0;
+    for (const e of discover()) {
+      if (e.source === "local") continue; // already on disk
+      const dest = join(USER_THEMES, e.slug + ".json");
+      if (existsSync(dest)) continue;
+      try {
+        const t = loadTheme(e.path);
+        t.type = e.appearance as "dark" | "light";
+        writeFileSync(dest, JSON.stringify({ name: t.name, type: t.type, colors: t.colors, tokenColors: t.tokenColors }, null, 2) + "\n");
+        console.log(`  ✓ ${e.slug}`);
+        n++;
+      } catch { console.log(`  ✗ ${e.slug} (unreadable)`); }
+    }
+    console.log(`\nsynced ${n} theme(s) → ${USER_THEMES.replace(process.env.HOME || "~", "~")}`);
+    break;
+  }
+  case "font": {
+    runFont(rest);
+    break;
+  }
   case "check": {
     runCheck();
     break;
   }
   default:
-    console.log("usage: theme <list|set|current|init|raycast|check> [name]");
+    console.log("usage: theme <list|set|current|init|sync|font|raycast|check> [name]");
     process.exit(cmd ? 1 : 0);
+}
+
+// ── fonts: the orthogonal font axis (family + size per role) ─────────────────
+//   theme font                      show the current font config
+//   theme font show                 (same)
+//   theme font set <role> <family> [size]
+//   theme font set <role> --size <n>
+// Roles: mono (base) · editor · terminal · ui. Edits ~/.config/monotheme/fonts.json
+// then re-applies the active theme so font changes land immediately.
+function runFont(argv: string[]): void {
+  const sub = argv[0] ?? "show";
+  const fonts: FontsConfig = existsSync(FONTS) ? (JSON5.parse(readFileSync(FONTS, "utf8")) as FontsConfig) : {};
+
+  if (sub === "show") {
+    if (!existsSync(FONTS)) { console.log("(no fonts.json — fonts are opt-in; try: theme font set mono \"Berkeley Mono\" 13)"); return; }
+    for (const role of FONT_ROLES) {
+      const r = resolveFont(fonts, role);
+      const raw = fonts[role];
+      const set = raw !== undefined ? "" : "  (inherited)";
+      console.log(`  ${role.padEnd(9)} ${(r.family ?? "—")}${r.size != null ? `  ${r.size}` : ""}${set}`);
+    }
+    return;
+  }
+
+  if (sub === "set") {
+    const role = argv[1] as FontRole | undefined;
+    if (!role || !FONT_ROLES.includes(role)) {
+      console.error(`usage: theme font set <${FONT_ROLES.join("|")}> "<family>" [size]  |  --size <n>`);
+      process.exit(1);
+    }
+    // parse: family is the first non-flag arg after role; size is a trailing
+    // number or --size <n>.
+    const rest2 = argv.slice(2);
+    let size: number | undefined;
+    const sizeFlag = rest2.indexOf("--size");
+    if (sizeFlag !== -1) { size = Number(rest2[sizeFlag + 1]); rest2.splice(sizeFlag, 2); }
+    const positional = rest2.filter((a) => !a.startsWith("--"));
+    let family: string | undefined = positional[0];
+    if (size === undefined && positional[1] !== undefined && /^\d+(\.\d+)?$/.test(positional[1])) size = Number(positional[1]);
+    if (family === "" ) family = undefined;
+
+    // merge into the existing spec (preserve the field you're not setting).
+    const prev = fonts[role];
+    const prevSpec = typeof prev === "string" ? { family: prev } : { ...(prev ?? {}) };
+    if (family !== undefined) prevSpec.family = family;
+    if (size !== undefined) prevSpec.size = size;
+    fonts[role] = prevSpec;
+
+    mkdirSync(CONFIG_HOME, { recursive: true });
+    writeFileSync(FONTS, JSON.stringify(fonts, null, 2) + "\n");
+    console.log(`font: ${role} → ${prevSpec.family ?? "(inherit)"}${prevSpec.size != null ? ` ${prevSpec.size}` : ""}`);
+
+    // re-apply the active theme so the font change lands now.
+    if (existsSync(ACTIVE)) applyTheme(ACTIVE, true);
+    else if (existsSync(STATE)) applyTheme(readFileSync(STATE, "utf8").trim(), true);
+    console.log("  ✓ applied");
+    return;
+  }
+
+  console.error("usage: theme font [show | set <role> \"<family>\" [size]]");
+  process.exit(1);
 }
 
 // ── self-check: known input -> expected output, no writes ───────────────────
 function runCheck(): void {
-  const sop = resolve(dirname(new URL(import.meta.url).pathname), "..", "themes", "shades-of-purple.json");
+  const sop = join(REPO_THEMES, "shades-of-purple.json");
   const theme = loadTheme(sop);
   const fail: string[] = [];
   const ok = (cond: boolean, msg: string) => { if (!cond) fail.push(msg); };
@@ -176,6 +267,14 @@ function runCheck(): void {
   ok(pf.ansi.length === 16 && pf.ansi.every(Boolean), "derived ANSI must fill all 16");
   ok(pf.warnings.length > 0, "missing-ANSI theme must warn");
 
+  // fonts: independent family/size resolution with mono-fallback
+  const fc: FontsConfig = { mono: { family: "Mono", size: 13 }, editor: { size: 14 }, terminal: "TermFont" };
+  const ed = resolveFont(fc, "editor");
+  ok(ed.family === "Mono" && ed.size === 14, `editor should inherit mono family + own size, got ${JSON.stringify(ed)}`);
+  const term = resolveFont(fc, "terminal");
+  ok(term.family === "TermFont" && term.size === 13, `terminal (string shorthand) should keep family + inherit mono size, got ${JSON.stringify(term)}`);
+  ok(Object.keys(resolveFont(null, "editor")).length === 0, "no fonts.json → resolveFont must return {} (opt-out)");
+
   if (fail.length) { console.error("CHECK FAILED:\n" + fail.map((f) => "  ✗ " + f).join("\n")); process.exit(1); }
-  console.log(`check: ok (${theme.tokenColors.length} scopes, ${theme.colors["terminal.ansiRed"] ? "native" : "derived"} ANSI, tmTheme+ghostty valid)`);
+  console.log(`check: ok (${theme.tokenColors.length} scopes, ${theme.colors["terminal.ansiRed"] ? "native" : "derived"} ANSI, tmTheme+ghostty valid, fonts resolve)`);
 }

@@ -23,7 +23,14 @@ export default defineTarget({
   name: "kitty",
   detect: (c) => c.has(c.config("kitty", "kitty.conf")),
   // Add `include monotheme.conf` to kitty.conf once; SIGUSR1 live-reloads colors.
+  // The same included file also carries the terminal font (opt-in).
   file: (c) => c.config("kitty", "monotheme.conf"),
-  render: (c) => toKitty(c.theme),
+  render: (c) => {
+    const f = c.font("terminal");
+    let out = toKitty(c.theme);
+    if (f.family) out += `font_family ${f.family}\n`;
+    if (f.size != null) out += `font_size ${f.size}\n`;
+    return out;
+  },
   reload: () => "pkill -USR1 -x kitty",
 });

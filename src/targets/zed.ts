@@ -138,8 +138,18 @@ export default defineTarget({
   // Zed watches its themes/ dir and hot-reloads; point settings.theme at our slot.
   build: (c) => {
     c.write(c.config("zed", "themes", "monotheme.json"), toZed(c.theme));
-    return c.setJson(c.config("zed", "settings.json"), "theme", ZED_THEME_NAME)
-      ? `theme = ${ZED_THEME_NAME}`
-      : "no settings.json";
+    const settings = c.config("zed", "settings.json");
+    const ok = c.setJson(settings, "theme", ZED_THEME_NAME);
+    // fonts (opt-in): editor + ui are top-level keys → setJson. Zed's terminal
+    // font lives under a nested "terminal" object which the top-level patcher
+    // can't reach, so it's left alone (inherits Zed's default).
+    const ed = c.font("editor"), ui = c.font("ui");
+    const notes: string[] = [];
+    if (ed.family && c.setJson(settings, "buffer_font_family", ed.family)) notes.push("editor");
+    if (ed.size) c.setJson(settings, "buffer_font_size", ed.size);
+    if (ui.family && c.setJson(settings, "ui_font_family", ui.family)) notes.push("ui");
+    if (ui.size) c.setJson(settings, "ui_font_size", ui.size);
+    const font = notes.length ? ` + font(${notes.join(",")})` : "";
+    return ok ? `theme = ${ZED_THEME_NAME}${font}` : "no settings.json";
   },
 });

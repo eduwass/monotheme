@@ -4,6 +4,7 @@ import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import JSON5 from "json5";
+import { REPO_THEMES, USER_THEMES } from "./paths.ts";
 
 export interface ThemeEntry {
   /** display label (slug used by `theme set`) */
@@ -16,16 +17,48 @@ export interface ThemeEntry {
   source: string;
 }
 
-const EXT_ROOTS = [
+// User-installed editor extensions (third-party themes live here).
+const USER_EXT_ROOTS = [
   join(homedir(), ".cursor", "extensions"),
   join(homedir(), ".vscode", "extensions"),
+  join(homedir(), ".vscode-oss", "extensions"),   // VSCodium
+  join(homedir(), ".windsurf", "extensions"),      // Windsurf
+  join(homedir(), ".vscode-insiders", "extensions"),
 ];
+
+// The editors' BUILT-IN themes ("Cursor Dark", "Dark Modern", "Default Dark+",
+// Monokai, …) ship bundled inside the app install, not in the user extensions
+// dir — same package.json → contributes.themes[] shape, different location.
+function bundledExtRoots(): string[] {
+  const roots: string[] = [];
+  if (process.platform === "darwin") {
+    for (const app of ["Cursor", "Visual Studio Code", "VSCodium", "Windsurf", "Visual Studio Code - Insiders"]) {
+      roots.push(join("/Applications", `${app}.app`, "Contents", "Resources", "app", "extensions"));
+    }
+  } else if (process.platform === "win32") {
+    const bases = [process.env.LOCALAPPDATA, process.env.ProgramFiles, process.env["ProgramFiles(x86)"]].filter(Boolean) as string[];
+    for (const b of bases) for (const app of ["Programs\\cursor", "Microsoft VS Code", "VSCodium", "Windsurf"]) {
+      roots.push(join(b, app, "resources", "app", "extensions"));
+    }
+  } else {
+    // linux: common package + tarball install prefixes.
+    for (const base of ["/usr/share", "/opt", "/usr/lib"]) for (const app of ["code", "code-insiders", "cursor", "vscodium", "codium", "windsurf"]) {
+      roots.push(join(base, app, "resources", "app", "extensions"));
+    }
+    roots.push(join(homedir(), ".local", "share", "cursor", "resources", "app", "extensions"));
+  }
+  return roots;
+}
+
+const EXT_ROOTS = [...USER_EXT_ROOTS, ...bundledExtRoots()];
 
 export function slugify(s: string): string {
   return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 
-const LOCAL_THEMES = resolve(dirname(new URL(import.meta.url).pathname), "..", "themes");
+// Theme libraries on disk: the config-home user/vendored dir (authoritative for
+// user data) plus the shipped default library. Scanned in that order.
+const THEME_DIRS = [USER_THEMES, REPO_THEMES];
 
 export function discover(): ThemeEntry[] {
   const out: ThemeEntry[] = [];
@@ -57,12 +90,14 @@ export function discover(): ThemeEntry[] {
     }
   }
 
-  // 2) local repo themes — fallback for slugs no editor provides (and for
-  //    machines without editors installed, e.g. a headless server).
-  if (existsSync(LOCAL_THEMES)) {
-    for (const f of readdirSync(LOCAL_THEMES)) {
+  // 2) on-disk theme libraries — fallback for slugs no editor provides (and for
+  //    machines without editors installed, e.g. a headless server). User/vendored
+  //    themes (config home) take precedence over the shipped defaults.
+  for (const dir of THEME_DIRS) {
+    if (!existsSync(dir)) continue;
+    for (const f of readdirSync(dir)) {
       if (!f.endsWith(".json")) continue;
-      const path = join(LOCAL_THEMES, f);
+      const path = join(dir, f);
       let appearance: "dark" | "light" = "dark";
       try { appearance = (JSON5.parse(readFileSync(path, "utf8")).type as "dark" | "light") ?? "dark"; } catch {}
       const label = f.replace(/\.json$/, "");

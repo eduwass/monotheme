@@ -53,6 +53,16 @@ export default defineTarget({
   // Add `general.import = ["~/.config/alacritty/monotheme.toml"]` once; live_config_reload
   // re-reads on change, and touching the main config nudges it.
   file: (c) => c.config("alacritty", "monotheme.toml"),
-  render: (c) => toAlacritty(c.theme),
+  render: (c) => {
+    const f = c.font("terminal");
+    let out = toAlacritty(c.theme);
+    // font (opt-in): [font] size + [font.normal] family. Imported alongside colors.
+    if (f.family || f.size != null) {
+      out += `\n[font]\n`;
+      if (f.size != null) out += `size = ${f.size}\n`;
+      if (f.family) out += `\n[font.normal]\nfamily = "${f.family}"\n`;
+    }
+    return out;
+  },
   reload: (c) => `touch "${c.config("alacritty", "alacritty.toml")}"`,
 });
