@@ -6,10 +6,24 @@ import { project, scopeColor, resolveToken } from "../project.ts";
 
 export const ZED_THEME_NAME = "Monotheme";
 
+// Blend two #rrggbb colours (t=0 → a, t=1 → b). Used to derive subtle chrome from
+// bg→fg instead of the theme's UI border key, which is often the accent colour.
+const mix = (a: string, b: string, t: number) => {
+  const rgb = (h: string) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const [ar, ag, ab] = rgb(a), [br, bg, bb] = rgb(b);
+  const c = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, "0");
+  return `#${c(ar, br)}${c(ag, bg)}${c(ab, bb)}`;
+};
+
 export function toZed(theme: VscodeTheme): string {
   const p = project(theme);
   const t = theme.tokenColors;
   const a = p.ansi;
+  // Subtle, theme-adaptive chrome so pane dividers/hovers don't glare (some themes
+  // set their UI border to the accent colour, which Zed paints on every divider).
+  const border = mix(p.bg, p.fg, 0.14);
+  const hover = mix(p.bg, p.fg, 0.07);
+  const thumb = mix(p.bg, p.fg, 0.22);
   // Resolve a Zed syntax token from the theme's tokenColors the way shiki/VSCode
   // do — most-specific scope wins, color + font style resolved independently —
   // so Zed's treesitter highlighting matches what VSCode would render.
@@ -51,16 +65,16 @@ export function toZed(theme: VscodeTheme): string {
           text: p.fg,
           "text.muted": p.fgMuted,
           "text.accent": p.accent,
-          border: p.border,
-          "border.variant": p.border,
+          border: border,
+          "border.variant": border,
           "border.focused": p.accent,
           "elevated_surface.background": p.bgPanel,
           "surface.background": p.bgPanel,
           "element.background": p.bgPanel,
-          "element.hover": p.border,
+          "element.hover": hover,
           "element.selected": p.selection,
           "element.active": p.selection,
-          "ghost_element.hover": p.border,
+          "ghost_element.hover": hover,
           "status_bar.background": p.bgPanel,
           "title_bar.background": p.bgPanel,
           "toolbar.background": p.bg,
@@ -68,7 +82,7 @@ export function toZed(theme: VscodeTheme): string {
           "tab.active_background": p.bg,
           "tab.inactive_background": p.bgPanel,
           "panel.background": p.bgPanel,
-          "scrollbar.thumb.background": p.border,
+          "scrollbar.thumb.background": thumb,
           "terminal.background": p.bg,
           "terminal.foreground": p.fg,
           "terminal.ansi.black": a[0], "terminal.ansi.red": a[1], "terminal.ansi.green": a[2],
