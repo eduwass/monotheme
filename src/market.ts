@@ -4,12 +4,12 @@
 // contributes, and vendors them into the config-home themes/ dir so they show up
 // in `theme list` and can be `theme set` like any other.
 import { execSync } from "node:child_process";
-import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import JSON5 from "json5";
 import plist from "plist";
-import { USER_THEMES } from "./paths.ts";
+import { USER_THEMES, CONFIG_HOME } from "./paths.ts";
 import { slugify } from "./discover.ts";
 
 const GALLERY = "https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery";
@@ -103,7 +103,7 @@ export interface ExtractedTheme { slug: string; name: string; type: "dark" | "li
 /** Download an extension's .vsix and extract every theme it contributes as an
  *  in-memory object — WITHOUT vendoring. Shared by `add` (which writes them) and
  *  the remote preview (which just renders one). */
-export async function fetchExtensionThemes(pubExt: string): Promise<{ label: string; themes: ExtractedTheme[] }> {
+export async function fetchExtensionThemes(pubExt: string): Promise<{ label: string; themes: ExtractedTheme[]; vsix: string }> {
   const m = /^([^.]+)\.(.+)$/.exec(pubExt);
   if (!m) throw new Error(`expected <publisher.extension>, got '${pubExt}'`);
   const [, publisher, extension] = m;
@@ -143,7 +143,13 @@ export async function fetchExtensionThemes(pubExt: string): Promise<{ label: str
       } catch { /* skip a theme file we can't parse; keep the rest */ }
     }
     if (!out.length) throw new Error(`${pubExt}: no readable themes (unsupported format?)`);
-    return { label: pkg.displayName ?? pubExt, themes: out };
+    // Persist the .vsix so `add` can install it into editors from the FILE (works
+    // even for Cursor, whose OpenVSX gallery may not list the extension by id).
+    const vsixDir = join(CONFIG_HOME, "vsix");
+    mkdirSync(vsixDir, { recursive: true });
+    const persisted = join(vsixDir, `${pubExt.replace(/[^a-z0-9.-]/gi, "_")}.vsix`);
+    copyFileSync(vsix, persisted);
+    return { label: pkg.displayName ?? pubExt, themes: out, vsix: persisted };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
   }
@@ -151,8 +157,8 @@ export async function fetchExtensionThemes(pubExt: string): Promise<{ label: str
 
 /** Download an extension's .vsix, extract every theme it contributes, and vendor
  *  them into the config-home themes/ dir. Returns the slugs added. */
-export async function addExtension(pubExt: string): Promise<{ added: string[]; label: string }> {
-  const { label, themes } = await fetchExtensionThemes(pubExt);
+export async function addExtension(pubExt: string): Promise<{ added: string[]; label: string; vsix: string }> {
+  const { label, themes, vsix } = await fetchExtensionThemes(pubExt);
   mkdirSync(USER_THEMES, { recursive: true });
   const added: string[] = [];
   for (const t of themes) {
@@ -160,5 +166,5 @@ export async function addExtension(pubExt: string): Promise<{ added: string[]; l
     writeFileSync(join(USER_THEMES, t.slug + ".json"), JSON.stringify(out, null, 2) + "\n");
     added.push(t.slug);
   }
-  return { added, label };
+  return { added, label, vsix };
 }

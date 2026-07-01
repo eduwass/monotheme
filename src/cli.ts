@@ -92,20 +92,36 @@ function propagate(canonical: string): void {
   }
 }
 
-// Editors that expose an `--install-extension` CLI. A Marketplace theme is only
-// colour DATA for terminals/etc.; Cursor/VSCode need the theme as an installed
-// extension for `workbench.colorTheme` to resolve, so we install it into whichever
-// editor CLIs are present (best-effort). discover() then prefers that editor copy.
-function editorClis(): { name: string; cmd: string }[] {
-  return [{ name: "Cursor", cmd: "cursor" }, { name: "VS Code", cmd: "code" }].filter((e) => {
-    try { execSync(`command -v ${e.cmd}`, { stdio: "ignore" }); return true; } catch { return false; }
-  });
+// A Marketplace theme is only colour DATA for terminals/etc.; Cursor/VSCode need
+// the theme as an installed extension for `workbench.colorTheme` to resolve, so we
+// install it into whichever editors are present. We resolve the REAL app-bundle
+// binaries (not PATH — `code` is often aliased to `cursor`), install from the local
+// .vsix (works even for Cursor's OpenVSX gallery), and parse output for failure
+// (Cursor's CLI exits 0 even when an install fails).
+function editorBins(): { name: string; bin: string }[] {
+  const home = process.env.HOME || "";
+  const candidates = [
+    { name: "Cursor", bins: ["/Applications/Cursor.app/Contents/Resources/app/bin/cursor", `${home}/Applications/Cursor.app/Contents/Resources/app/bin/cursor`, "/usr/share/cursor/bin/cursor", "/opt/cursor/bin/cursor"] },
+    { name: "VS Code", bins: ["/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code", `${home}/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code`, "/usr/share/code/bin/code", "/usr/bin/code"] },
+    { name: "VS Code Insiders", bins: ["/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code-insiders"] },
+  ];
+  const out: { name: string; bin: string }[] = [];
+  for (const c of candidates) {
+    const bin = c.bins.find((b) => existsSync(b));
+    if (bin) out.push({ name: c.name, bin });
+  }
+  return out;
 }
-function editorExtension(pubExt: string, verb: "install" | "uninstall"): string[] {
+/** install a local .vsix / uninstall by id into every detected editor. `arg` is a
+ *  vsix path for install, a publisher.extension id for uninstall. */
+function editorExtension(arg: string, verb: "install" | "uninstall"): string[] {
   const done: string[] = [];
   const flag = verb === "install" ? " --force" : "";
-  for (const e of editorClis()) {
-    try { execSync(`${e.cmd} --${verb}-extension ${pubExt}${flag}`, { stdio: "ignore", timeout: 120000 }); done.push(e.name); } catch { /* not present / failed */ }
+  for (const e of editorBins()) {
+    try {
+      const out = execSync(`"${e.bin}" --${verb}-extension "${arg}"${flag} 2>&1`, { encoding: "utf8", timeout: 120000 });
+      if (!/failed|not found|unable to/i.test(out)) done.push(e.name); // CLI exits 0 even on failure → parse
+    } catch { /* editor missing / real error */ }
   }
   return done;
 }
@@ -292,10 +308,11 @@ switch (cmd) {
     if (!id) { console.error("usage: theme add <publisher.extension>   (find ids via: theme browse <query>)"); process.exit(1); }
     const { addExtension } = await import("./market.ts");
     try {
-      const { added, label } = await addExtension(id);
+      const { added, label, vsix } = await addExtension(id);
       // Also install the actual extension into Cursor/VSCode so their colorTheme
-      // resolves (they need the extension, not just the vendored colour data).
-      const editors = editorExtension(id!, "install");
+      // resolves (they need the extension, not just the vendored colour data). Install
+      // from the local .vsix so it works regardless of each editor's gallery.
+      const editors = editorExtension(vsix, "install");
       if (rest.includes("--json")) { console.log(JSON.stringify({ added, label, set: added[0] ?? null, editors })); break; }
       console.log(`fetching ${id}…`);
       for (const s of added) console.log(`  ✓ ${s}`);
