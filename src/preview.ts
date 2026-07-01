@@ -38,7 +38,21 @@ const SCOPES: Record<Kind, string[]> = {
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-export function toPreviewSvg(theme: VscodeTheme): string {
+// Common Nerd Font glyphs (branch · folder · file · star · github · code · bolt ·
+// home) — render as icons in a Nerd Font, tofu otherwise, so only add for NF fonts.
+const NF_GLYPHS = "              ";
+
+const DEFAULT_MONO = "ui-monospace, 'SF Mono', Menlo, monospace";
+
+export interface PreviewOpts {
+  /** font-family for the code (used by the font grid to preview a specific font). */
+  fontFamily?: string;
+  /** append a line of Nerd Font glyphs (only meaningful for NF fonts). */
+  nerdGlyphs?: boolean;
+}
+
+export function toPreviewSvg(theme: VscodeTheme, opts: PreviewOpts = {}): string {
+  const codeFont = opts.fontFamily ? `${opts.fontFamily}, ${DEFAULT_MONO}` : DEFAULT_MONO;
   const p = project(theme);
   const t = theme.tokenColors;
   const colorFor = (kind: Kind): { fill: string; italic: boolean } => {
@@ -55,7 +69,8 @@ export function toPreviewSvg(theme: VscodeTheme): string {
   const W = 480, H = 300, pad = 16, bar = 30, lh = 21, fs = 13;
   const dots = [p.ansi[1], p.ansi[3], p.ansi[2]];
 
-  const lines = SNIPPET.map((line, i) => {
+  const rows: Tok[][] = opts.nerdGlyphs ? [...SNIPPET, [[`// ${NF_GLYPHS}`, "com"]]] : SNIPPET;
+  const lines = rows.map((line, i) => {
     const y = bar + pad + 4 + i * lh;
     let x = pad;
     const spans = line
@@ -66,7 +81,7 @@ export function toPreviewSvg(theme: VscodeTheme): string {
         return span;
       })
       .join("");
-    return `<text y="${y}" font-family="ui-monospace, 'SF Mono', Menlo, monospace" font-size="${fs}">${spans}</text>`;
+    return `<text y="${y}" font-family="${esc(codeFont)}" font-size="${fs}">${spans}</text>`;
   }).join("\n");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">

@@ -21,6 +21,7 @@ import { raycastImportUrl } from "./formats/raycast.ts";
 import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, migrateConfigHome, hydrateDefaults } from "./paths.ts";
 import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
 import { catalogWithStatus, findFont, installFont, resolveFamily } from "./fonts-catalog.ts";
+import { toPreviewSvg } from "./preview.ts";
 import JSON5 from "json5";
 
 // One-time move of legacy clone-root state into ~/.config/monotheme/ (no-op after),
@@ -162,8 +163,10 @@ switch (cmd) {
   }
   case "preview": {
     // render a code-sample preview card (SVG) for any theme — works for custom /
-    // local themes too, since it's generated from the theme's own colors.
-    const { toPreviewSvg } = await import("./preview.ts");
+    // local themes too. WYSIWYG: uses your CURRENT font so the card shows how the
+    // theme will actually look in your setup.
+    const cf = loadFonts();
+    const curFont = resolveFont(cf, "editor").family ?? resolveFont(cf, "mono").family;
     const arg = rest.find((r) => !r.startsWith("--"));
     let theme;
     if (arg) {
@@ -174,22 +177,20 @@ switch (cmd) {
     else { console.error("theme: no theme given and none active"); process.exit(1); }
     const dir = join(CONFIG_HOME, "previews");
     if (rest.includes("--all")) {
-      // generate previews for every discovered theme; print {slug: path} for the
-      // Raycast grid to consume in one shot.
       mkdirSync(dir, { recursive: true });
       const map: Record<string, string> = {};
       for (const e of discover()) {
         try {
           const th = loadTheme(e.path); th.type = e.appearance as "dark" | "light";
           const out = join(dir, e.slug + ".svg");
-          writeFileSync(out, toPreviewSvg(th));
+          writeFileSync(out, toPreviewSvg(th, { fontFamily: curFont }));
           map[e.slug] = out;
         } catch { /* skip unreadable */ }
       }
       console.log(JSON.stringify(map));
       break;
     }
-    const svg = toPreviewSvg(theme);
+    const svg = toPreviewSvg(theme, { fontFamily: curFont });
     if (rest.includes("--stdout")) { process.stdout.write(svg); break; }
     mkdirSync(dir, { recursive: true });
     const out = join(dir, slugify(theme.name) + ".svg");
@@ -268,6 +269,38 @@ function runFont(argv: string[]): void {
       const set = raw !== undefined ? "" : "  (inherited)";
       console.log(`  ${role.padEnd(9)} ${(r.family ?? "—")}${r.size != null ? `  ${r.size}` : ""}${set}`);
     }
+    return;
+  }
+
+  if (sub === "preview") {
+    // font specimen: the SAME snippet in your CURRENT theme's colors, rendered in
+    // each font (+ Nerd Font glyphs for NF fonts) — so you preview the font itself.
+    let theme;
+    if (existsSync(ACTIVE)) theme = loadTheme(ACTIVE);
+    else theme = loadTheme(join(REPO_THEMES, "tokyo-night-storm.json"));
+    const dir = join(CONFIG_HOME, "font-previews");
+    const cat = catalogWithStatus();
+    if (argv.includes("--all")) {
+      mkdirSync(dir, { recursive: true });
+      const map: Record<string, string> = {};
+      for (const f of cat) {
+        const out = join(dir, f.id + ".svg");
+        writeFileSync(out, toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: f.hasNerdFont }));
+        map[f.id] = out;
+      }
+      console.log(JSON.stringify(map));
+      return;
+    }
+    const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const q = norm(argv[1] ?? "");
+    const f = cat.find((x) => norm(x.id) === q || norm(x.name) === q);
+    if (!f) { console.error(`theme font: unknown font '${argv[1]}'`); process.exit(1); }
+    const svg = toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: f.hasNerdFont });
+    if (argv.includes("--stdout")) { process.stdout.write(svg); return; }
+    mkdirSync(dir, { recursive: true });
+    const out = join(dir, f.id + ".svg");
+    writeFileSync(out, svg);
+    console.log(out);
     return;
   }
 
