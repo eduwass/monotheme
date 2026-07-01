@@ -36,7 +36,7 @@ export function hueBucket(hsl: { h: number; s: number; l: number }): Hue {
   if (h < 70) return "yellow";
   if (h < 165) return "green";
   if (h < 200) return "cyan";
-  if (h < 255) return "blue";
+  if (h < 240) return "blue"; // real blue themes cluster ~195–225; 240+ reads violet
   if (h < 300) return "purple";
   return "pink";
 }
@@ -46,11 +46,17 @@ export function hueBucket(hsl: { h: number; s: number; l: number }): Hue {
  *  Dracula reads purple rather than its muted accent key. Falls back to mono. */
 export function dominantColor(theme: VscodeTheme): { hex: string; hue: Hue } {
   const p = project(theme);
-  // Trust the accent when it's actually chromatic — it's the theme's identity
-  // colour (ayu→orange, github→green). Only when the accent is muted/grey (e.g.
-  // Dracula's) fall back to the most-saturated ANSI slot so it still reads right.
+  // 1) A deliberately TINTED background dominates visually (it's the largest area):
+  //    Shades of Purple's #2D2B55 reads purple. Require enough saturation AND
+  //    lightness that it's a perceived colour, not a near-black with a faint cast
+  //    (ayu/github backgrounds are #0d10xx — saturated but l≈0.07, i.e. black).
+  const bg = hexToHsl(p.bg);
+  if (bg && bg.s >= 0.25 && bg.l >= 0.18 && bg.l <= 0.8) return { hex: p.bg, hue: hueBucket(bg) };
+  // 2) Else trust the accent when it's actually chromatic — the theme's identity
+  //    colour (ayu→orange, github→green).
   const acc = hexToHsl(p.accent);
   if (acc && acc.s >= 0.35 && acc.l >= 0.15 && acc.l <= 0.9) return { hex: p.accent, hue: hueBucket(acc) };
+  // 3) Else (muted accent, e.g. Dracula's) the most-saturated ANSI slot.
   const ansi = p.ansi ?? [];
   let best: { hex: string; hsl: NonNullable<ReturnType<typeof hexToHsl>> } | null = null;
   for (const i of [5, 1, 4, 2, 3, 6, 13, 9, 12, 10, 11, 14]) {

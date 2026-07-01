@@ -187,17 +187,26 @@ switch (cmd) {
       if (!id) { console.error('usage: theme preview <publisher.extension> --remote   (ids via: theme browse)'); process.exit(1); }
       const rdir = join(CONFIG_HOME, "previews", "remote");
       const cache = join(rdir, slugify(id) + ".svg");
+      const meta = join(rdir, slugify(id) + ".json"); // sidecar: dominant colour
       let svg: string;
-      if (existsSync(cache)) svg = readFileSync(cache, "utf8");
-      else {
+      let info: { hue: string; accent: string };
+      if (existsSync(cache) && existsSync(meta)) {
+        svg = readFileSync(cache, "utf8");
+        info = JSON.parse(readFileSync(meta, "utf8"));
+      } else {
         const { fetchExtensionThemes } = await import("./market.ts");
         const { themes } = await fetchExtensionThemes(id);
         if (!themes.length) { console.error(`theme preview: ${id} contributes no themes`); process.exit(1); }
         const th = themes[0];
-        svg = toPreviewSvg({ name: th.name, type: th.type, colors: th.colors, tokenColors: th.tokenColors } as any, { fontFamily: curFont });
+        const themeObj = { name: th.name, type: th.type, colors: th.colors, tokenColors: th.tokenColors } as any;
+        svg = toPreviewSvg(themeObj, { fontFamily: curFont });
+        const d = dominantColor(themeObj);
+        info = { hue: d.hue, accent: d.hex };
         mkdirSync(rdir, { recursive: true });
         writeFileSync(cache, svg);
+        writeFileSync(meta, JSON.stringify(info));
       }
+      if (rest.includes("--json")) { console.log(JSON.stringify({ path: cache, ...info })); break; }
       if (rest.includes("--stdout")) { process.stdout.write(svg); break; }
       console.log(cache);
       break;
