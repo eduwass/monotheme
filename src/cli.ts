@@ -243,14 +243,19 @@ switch (cmd) {
     break;
   }
   case "browse": {
-    // search the VS Code Marketplace for themes (the source vscodethemes.com indexes)
+    // Search the VS Code Marketplace for themes (the source vscodethemes.com indexes).
+    // Empty query → browse top themes. --page N and --sort <relevance|installs|
+    // trending|recent> mirror the site's paging + Sort By.
     const q = rest.filter((r) => !r.startsWith("--")).join(" ");
-    if (!q) { console.error('usage: theme browse "<query>"   then: theme add <publisher.extension>'); process.exit(1); }
-    const { searchThemes } = await import("./market.ts");
+    const pageArg = rest.find((r) => r.startsWith("--page="));
+    const sortArg = rest.find((r) => r.startsWith("--sort="));
+    const pageNumber = pageArg ? Math.max(1, parseInt(pageArg.split("=")[1], 10) || 1) : 1;
+    const { searchThemes, SORT } = await import("./market.ts");
+    const sortBy = sortArg ? (SORT[sortArg.split("=")[1]] ?? SORT.installs) : SORT.installs;
     try {
-      const hits = await searchThemes(q);
+      const hits = await searchThemes(q, { pageNumber, sortBy });
       if (rest.includes("--json")) { console.log(JSON.stringify(hits)); break; }
-      if (!hits.length) { console.log(`no theme extensions match '${q}'`); break; }
+      if (!hits.length) { console.log(q ? `no theme extensions match '${q}'` : "no themes found"); break; }
       for (const h of hits) {
         console.log(`  ${h.id.padEnd(42)} ${(h.installs.toLocaleString() + " installs").padStart(16)}  ${h.displayName}`);
       }

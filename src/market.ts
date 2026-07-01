@@ -25,17 +25,20 @@ export interface MarketTheme {
 }
 
 /** Search the Marketplace for theme extensions matching a query, most-installed first. */
-export async function searchThemes(query: string, pageSize = 20): Promise<MarketTheme[]> {
+// Marketplace sortBy codes → the vscodethemes.com-style options.
+export const SORT: Record<string, number> = { relevance: 0, installs: 4, trending: 10, recent: 1 };
+
+export async function searchThemes(query: string, opts: { pageSize?: number; pageNumber?: number; sortBy?: number } = {}): Promise<MarketTheme[]> {
+  const { pageSize = 20, pageNumber = 1, sortBy = 4 } = opts;
+  // Empty query → browse the whole "Themes" category (top themes), like the site.
+  const criteria: any[] = [
+    { filterType: 8, value: "Microsoft.VisualStudio.Code" },
+    { filterType: 5, value: "Themes" },
+  ];
+  if (query.trim()) criteria.push({ filterType: 10, value: query });
   const body = {
-    filters: [{
-      criteria: [
-        { filterType: 8, value: "Microsoft.VisualStudio.Code" },
-        { filterType: 10, value: query },
-        { filterType: 5, value: "Themes" },
-      ],
-      pageNumber: 1, pageSize, sortBy: 4, sortOrder: 0,
-    }],
-    flags: 914,
+    filters: [{ criteria, pageNumber, pageSize, sortBy, sortOrder: 0 }],
+    flags: 918, // 914 + IncludeCategoryAndTags(4), so we can drop icon-theme extensions
   };
   const res = await fetch(GALLERY, {
     method: "POST",
@@ -45,7 +48,10 @@ export async function searchThemes(query: string, pageSize = 20): Promise<Market
   if (!res.ok) throw new Error(`marketplace query failed (${res.status})`);
   const data = (await res.json()) as any;
   const exts = data.results?.[0]?.extensions ?? [];
-  return exts.map((e: any): MarketTheme => ({
+  // The "Themes" category also holds icon / product-icon themes (Material Icon Theme
+  // etc.) which contribute no colour theme — drop them by tag so they don't pollute.
+  const isIconTheme = (e: any) => (e.tags ?? []).some((t: string) => /(^|-)icon-theme$/i.test(t) || t.toLowerCase() === "icon-theme" || t.toLowerCase() === "product-icon-theme");
+  return exts.filter((e: any) => !isIconTheme(e)).map((e: any): MarketTheme => ({
     publisher: e.publisher.publisherName,
     extension: e.extensionName,
     id: `${e.publisher.publisherName}.${e.extensionName}`,
@@ -98,7 +104,7 @@ export async function fetchExtensionThemes(pubExt: string): Promise<{ label: str
   const [, publisher, extension] = m;
 
   // resolve latest version via a lookup (so callers can pass just publisher.ext)
-  const results = await searchThemes(`${publisher} ${extension}`, 25);
+  const results = await searchThemes(`${publisher} ${extension}`, { pageSize: 25 });
   const hit = results.find((r) => r.id.toLowerCase() === pubExt.toLowerCase());
   const version = hit?.version;
   if (!version) throw new Error(`'${pubExt}' not found as a theme extension on the Marketplace`);
