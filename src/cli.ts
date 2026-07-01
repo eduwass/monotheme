@@ -228,7 +228,7 @@ switch (cmd) {
     break;
   }
   case "font": {
-    runFont(rest);
+    await runFont(rest);
     break;
   }
   case "check": {
@@ -247,7 +247,7 @@ switch (cmd) {
 //   theme font set <role> --size <n>
 // Roles: mono (base) · editor · terminal · ui. Edits ~/.config/monotheme/fonts.json
 // then re-applies the active theme so font changes land immediately.
-function runFont(argv: string[]): void {
+async function runFont(argv: string[]): Promise<void> {
   const sub = argv[0] ?? "show";
   const fonts: FontsConfig = existsSync(FONTS) ? (JSON5.parse(readFileSync(FONTS, "utf8")) as FontsConfig) : {};
 
@@ -295,10 +295,16 @@ function runFont(argv: string[]): void {
     const q = norm(argv[1] ?? "");
     const f = cat.find((x) => norm(x.id) === q || norm(x.name) === q);
     if (!f) { console.error(`theme font: unknown font '${argv[1]}'`); process.exit(1); }
-    const svg = toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: !!f.nerdFont && f.setFamily === f.nerdFont });
+    // Faithful render: pull the real font file and render glyphs-as-paths via
+    // Satori, so the actual typeface shows even if it's not installed. Falls back
+    // to the name-based SVG when the font isn't on the CDN.
+    const { resolveFontFile, renderSpecimen } = await import("./font-specimen.ts");
+    const data = await resolveFontFile(f.id, f.name);
+    const svg = (data && (await renderSpecimen(theme, data))) || toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: !!f.nerdFont && f.setFamily === f.nerdFont });
     if (argv.includes("--stdout")) { process.stdout.write(svg); return; }
-    mkdirSync(dir, { recursive: true });
-    const out = join(dir, f.id + ".svg");
+    const hd = join(CONFIG_HOME, "font-previews-hd");
+    mkdirSync(hd, { recursive: true });
+    const out = join(hd, f.id + ".svg");
     writeFileSync(out, svg);
     console.log(out);
     return;

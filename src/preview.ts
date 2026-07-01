@@ -6,11 +6,11 @@
 import type { VscodeTheme } from "./load.ts";
 import { project, resolveToken } from "./project.ts";
 
-type Kind = "kw" | "fn" | "str" | "num" | "com" | "prop" | "var" | "punct" | "plain";
-type Tok = [string, Kind];
+export type Kind = "kw" | "fn" | "str" | "num" | "com" | "prop" | "var" | "punct" | "plain";
+export type Tok = [string, Kind];
 
 // A fixed, hand-tokenized snippet (no tokenizer needed — same sample every time).
-const SNIPPET: Tok[][] = [
+export const SNIPPET: Tok[][] = [
   [["// monotheme preview", "com"]],
   [["const", "kw"], [" btn ", "plain"], ["=", "punct"], [" document", "var"], [".", "punct"], ["getElementById", "fn"], ["(", "punct"], ["'btn'", "str"], [")", "punct"]],
   [["let", "kw"], [" count ", "plain"], ["=", "punct"], [" 0", "num"]],
@@ -24,7 +24,7 @@ const SNIPPET: Tok[][] = [
   [["}", "punct"]],
 ];
 
-const SCOPES: Record<Kind, string[]> = {
+export const SCOPES: Record<Kind, string[]> = {
   kw: ["keyword", "storage.type", "keyword.control"],
   fn: ["entity.name.function", "support.function", "meta.function-call"],
   str: ["string", "string.template", "string.quoted"],
@@ -51,8 +51,9 @@ export interface PreviewOpts {
   nerdGlyphs?: boolean;
 }
 
-export function toPreviewSvg(theme: VscodeTheme, opts: PreviewOpts = {}): string {
-  const codeFont = opts.fontFamily ? `${opts.fontFamily}, ${DEFAULT_MONO}` : DEFAULT_MONO;
+/** Resolve the theme's colors for the specimen: chrome + a style per token kind.
+ *  Shared by the raw-SVG (toPreviewSvg) and the Satori faithful renderer. */
+export function specimenStyles(theme: VscodeTheme) {
   const p = project(theme);
   const t = theme.tokenColors;
   const colorFor = (kind: Kind): { fill: string; italic: boolean } => {
@@ -62,9 +63,13 @@ export function toPreviewSvg(theme: VscodeTheme, opts: PreviewOpts = {}): string
     }
     return { fill: p.fg, italic: false };
   };
-  const styles: Record<Kind, { fill: string; italic: boolean }> = Object.fromEntries(
-    (Object.keys(SCOPES) as Kind[]).map((k) => [k, colorFor(k)]),
-  ) as any;
+  const styles = Object.fromEntries((Object.keys(SCOPES) as Kind[]).map((k) => [k, colorFor(k)])) as Record<Kind, { fill: string; italic: boolean }>;
+  return { p, styles };
+}
+
+export function toPreviewSvg(theme: VscodeTheme, opts: PreviewOpts = {}): string {
+  const codeFont = opts.fontFamily ? `${opts.fontFamily}, ${DEFAULT_MONO}` : DEFAULT_MONO;
+  const { p, styles } = specimenStyles(theme);
 
   const W = 480, H = 300, pad = 16, bar = 30, lh = 21, fs = 13;
   const dots = [p.ansi[1], p.ansi[3], p.ansi[2]];
