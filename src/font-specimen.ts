@@ -74,22 +74,24 @@ const div = (style: any, children: any) => ({ type: "div", props: { style, child
 // forever. Rendered in the actual font via Satori (vector paths), so it's faithful
 // even when the font isn't installed.
 export async function renderSpecimen(data: Buffer, opts: { name: string; nerdGlyphs?: boolean }): Promise<string | null> {
-  const bg = "#1b1b20", fg = "#e6e6ea", accent = "#7aa2f7", green = "#9ece6a", muted = "#9aa0aa";
-  const row = (color: string, size: number, mb: number, text: string) =>
-    div({ display: "flex", color, fontSize: size, marginBottom: mb, whiteSpace: "pre" }, text);
+  // Google-Fonts-style specimen: small name, then one large sample sentence in the
+  // font (same sentence for every font, so you compare typefaces directly). A
+  // subtle ligature/glyph line at the bottom for the programming-font angle.
+  const bg = "#fbfbfa", ink = "#1c1c21", sub = "#9a9aa2", green = "#3f9e57", accent = "#5b6bd6";
+  const row = (color: string, size: number, extra: any, text: string) =>
+    div({ display: "flex", color, fontSize: size, ...extra }, text);
   const children = [
-    row(accent, 30, 16, opts.name),
-    row(fg, 17, 8, "ABCDEFGHIJKLM abcdefghijklm"),
-    row(fg, 17, 8, "0123456789  (){}[]  &@#$%"),
-    row(green, 20, 8, "-> => != === >= <= |> ++ /* */"),
+    row(sub, 14, { marginBottom: 16 }, opts.name),
+    row(ink, 33, { marginBottom: 16, width: 452, lineHeight: 1.15 }, "Whereas recognition of the inherent dignity"),
+    row(green, 18, { whiteSpace: "pre" }, "-> => != === >= <= |>   0123 (){}[]"),
   ];
-  if (opts.nerdGlyphs) children.push(row(muted, 22, 0, NF_GLYPHS));
+  if (opts.nerdGlyphs) children.push(row(accent, 22, { whiteSpace: "pre", marginTop: 14 }, NF_GLYPHS));
   const tree = div(
-    { display: "flex", flexDirection: "column", justifyContent: "center", width: 480, height: 300, backgroundColor: bg, fontFamily: "Spec", padding: 30 },
+    { display: "flex", flexDirection: "column", justifyContent: "center", width: 520, height: 340, backgroundColor: bg, fontFamily: "Spec", padding: 38 },
     children,
   );
   try {
-    return await satori(tree as any, { width: 480, height: 300, fonts: [{ name: "Spec", data, weight: 400, style: "normal" }] });
+    return await satori(tree as any, { width: 520, height: 340, fonts: [{ name: "Spec", data, weight: 400, style: "normal" }] });
   } catch {
     return null;
   }
