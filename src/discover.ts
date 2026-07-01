@@ -60,6 +60,26 @@ export function slugify(s: string): string {
 // user data) plus the shipped default library. Scanned in that order.
 const THEME_DIRS = [USER_THEMES, REPO_THEMES];
 
+// Built-in editor themes label themselves with a localization placeholder
+// (e.g. "%darkModernThemeLabel%") that resolves via the extension's
+// package.nls.json. Resolve those to their human name; leave plain labels as-is.
+function resolveNls(extDir: string, label: string): string {
+  const m = /^%(.+)%$/.exec(label);
+  if (!m) return label;
+  for (const f of ["package.nls.json", "package.nls.en.json"]) {
+    const p = join(extDir, f);
+    if (!existsSync(p)) continue;
+    try {
+      const nls = JSON5.parse(readFileSync(p, "utf8"));
+      const v = nls[m[1]!];
+      // entries can be a string or { message: string }
+      const s = typeof v === "string" ? v : v?.message;
+      if (typeof s === "string" && s.trim()) return s;
+    } catch { /* fall through */ }
+  }
+  return label; // unresolved — better a raw label than crashing
+}
+
 export function discover(): ThemeEntry[] {
   const out: ThemeEntry[] = [];
   const seen = new Set<string>();
@@ -83,7 +103,8 @@ export function discover(): ThemeEntry[] {
         if (!th?.path) continue;
         const path = resolve(join(root, ext), th.path);
         if (!existsSync(path)) continue;
-        const label = th.label ?? th.id ?? th.path;
+        const rawLabel = th.label ?? th.id ?? th.path;
+        const label = resolveNls(join(root, ext), rawLabel);
         const appearance: "dark" | "light" = th.uiTheme === "vs" ? "light" : "dark";
         add({ label, slug: slugify(label), appearance, path, source: ext });
       }
