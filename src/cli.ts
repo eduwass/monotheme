@@ -20,6 +20,7 @@ import { toGhostty } from "./targets/ghostty.ts";
 import { raycastImportUrl } from "./formats/raycast.ts";
 import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, migrateConfigHome, hydrateDefaults } from "./paths.ts";
 import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
+import { FONT_CATALOG, catalogWithStatus } from "./fonts-catalog.ts";
 import JSON5 from "json5";
 
 // One-time move of legacy clone-root state into ~/.config/monotheme/ (no-op after),
@@ -204,22 +205,49 @@ function runFont(argv: string[]): void {
     return;
   }
 
-  if (sub === "set") {
-    const role = argv[1] as FontRole | undefined;
-    if (!role || !FONT_ROLES.includes(role)) {
-      console.error(`usage: theme font set <${FONT_ROLES.join("|")}> "<family>" [size]  |  --size <n>`);
-      process.exit(1);
+  if (sub === "catalog") {
+    const cat = catalogWithStatus();
+    if (rest.includes("--json") || argv.includes("--json")) { console.log(JSON.stringify(cat)); return; }
+    for (const f of cat) {
+      console.log(`  ${f.installed ? "✓" : "⤓"} ${f.id.padEnd(16)} ${f.name}${f.ligatures ? "  ~lig" : ""}${f.note ? `  — ${f.note}` : ""}`);
     }
-    // parse: family is the first non-flag arg after role; size is a trailing
-    // number or --size <n>.
-    const rest2 = argv.slice(2);
+    console.log(`\n✓ installed · ⤓ available (theme font install <id>)`);
+    return;
+  }
+
+  if (sub === "install") {
+    const id = (argv[1] ?? "").toLowerCase();
+    const font = FONT_CATALOG.find((f) => f.id === id || f.name.toLowerCase() === id);
+    if (!font) { console.error(`theme font: unknown font '${argv[1]}' (try: theme font catalog)`); process.exit(1); }
+    if (!font.cask) { console.error(`${font.name}: no Homebrew cask${font.note ? ` — ${font.note}` : ""}`); process.exit(1); }
+    if (process.platform !== "darwin") { console.error("theme font install: macOS/Homebrew only"); process.exit(1); }
+    console.log(`installing ${font.name} (${font.cask})…`);
+    try { execSync(`brew install --cask ${font.cask}`, { stdio: "inherit" }); }
+    catch { console.error("theme font install: brew failed"); process.exit(1); }
+    console.log(`  ✓ installed ${font.name}`);
+    return;
+  }
+
+  if (sub === "set") {
+    // Role is OPTIONAL. `theme font set <family> [size]` sets `mono` — the base
+    // that every surface inherits, i.e. changes the font *everywhere* (matches
+    // monotheme's one-switch philosophy). `theme font set <role> <family> [size]`
+    // is the drill-down for a single surface.
+    let a = argv.slice(1);
+    let role: FontRole = "mono";
+    if (a[0] && (FONT_ROLES as string[]).includes(a[0])) { role = a[0] as FontRole; a = a.slice(1); }
+
     let size: number | undefined;
-    const sizeFlag = rest2.indexOf("--size");
-    if (sizeFlag !== -1) { size = Number(rest2[sizeFlag + 1]); rest2.splice(sizeFlag, 2); }
-    const positional = rest2.filter((a) => !a.startsWith("--"));
+    const sizeFlag = a.indexOf("--size");
+    if (sizeFlag !== -1) { size = Number(a[sizeFlag + 1]); a.splice(sizeFlag, 2); }
+    const positional = a.filter((x) => !x.startsWith("--"));
     let family: string | undefined = positional[0];
     if (size === undefined && positional[1] !== undefined && /^\d+(\.\d+)?$/.test(positional[1])) size = Number(positional[1]);
-    if (family === "" ) family = undefined;
+    if (family === "") family = undefined;
+    if (family === undefined && size === undefined) {
+      console.error(`usage: theme font set "<family>" [size]            # everywhere\n       theme font set <${FONT_ROLES.join("|")}> "<family>" [size]`);
+      process.exit(1);
+    }
 
     // merge into the existing spec (preserve the field you're not setting).
     const prev = fonts[role];
@@ -230,7 +258,7 @@ function runFont(argv: string[]): void {
 
     mkdirSync(CONFIG_HOME, { recursive: true });
     writeFileSync(FONTS, JSON.stringify(fonts, null, 2) + "\n");
-    console.log(`font: ${role} → ${prevSpec.family ?? "(inherit)"}${prevSpec.size != null ? ` ${prevSpec.size}` : ""}`);
+    console.log(`font: ${role}${role === "mono" ? " (everywhere)" : ""} → ${prevSpec.family ?? "(inherit)"}${prevSpec.size != null ? ` ${prevSpec.size}` : ""}`);
 
     // re-apply the active theme so the font change lands now.
     if (existsSync(ACTIVE)) applyTheme(ACTIVE, true);
@@ -239,7 +267,7 @@ function runFont(argv: string[]): void {
     return;
   }
 
-  console.error("usage: theme font [show | set <role> \"<family>\" [size]]");
+  console.error("usage: theme font [show | set [<role>] \"<family>\" [size] | catalog | install <id>]");
   process.exit(1);
 }
 
