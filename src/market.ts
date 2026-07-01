@@ -8,6 +8,7 @@ import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync, existsSync
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import JSON5 from "json5";
+import plist from "plist";
 import { USER_THEMES } from "./paths.ts";
 import { slugify } from "./discover.ts";
 
@@ -60,7 +61,20 @@ const uiToType = (ui?: string): "dark" | "light" => (ui === "vs" || ui === "hc-l
 // Resolve a VS Code theme file, following one level of `include`, merging
 // colors + tokenColors (base first, override on top) — how VS Code composes them.
 function loadThemeFile(path: string): { colors: any; tokenColors: any[]; type?: string } {
-  const raw = JSON5.parse(readFileSync(path, "utf8"));
+  const text = readFileSync(path, "utf8");
+  // Some (older) extensions ship TextMate .tmTheme themes — XML plists, not JSON.
+  // Their `settings` array is already the tokenColors shape; the entry without a
+  // scope carries the global editor colours.
+  if (text.trimStart().startsWith("<")) {
+    const pl = plist.parse(text) as any;
+    const settings: any[] = Array.isArray(pl?.settings) ? pl.settings : [];
+    const global = settings.find((s) => !s.scope)?.settings ?? {};
+    const colors: any = {};
+    if (global.background) colors["editor.background"] = global.background;
+    if (global.foreground) colors["editor.foreground"] = global.foreground;
+    return { colors, tokenColors: settings.filter((s) => s.scope) };
+  }
+  const raw = JSON5.parse(text);
   let base: any = { colors: {}, tokenColors: [] };
   if (raw.include) {
     const inc = resolve(dirname(path), raw.include);
@@ -109,10 +123,13 @@ export async function fetchExtensionThemes(pubExt: string): Promise<{ label: str
       if (!th?.path) continue;
       const tp = resolve(join(tmp, "extension"), th.path);
       if (!existsSync(tp)) continue;
-      const label = th.label ?? th.id ?? th.path;
-      const resolved = loadThemeFile(tp);
-      out.push({ slug: slugify(label), name: label, type: resolved.type ?? uiToType(th.uiTheme), colors: resolved.colors, tokenColors: resolved.tokenColors });
+      try {
+        const label = th.label ?? th.id ?? th.path;
+        const resolved = loadThemeFile(tp);
+        out.push({ slug: slugify(label), name: label, type: resolved.type ?? uiToType(th.uiTheme), colors: resolved.colors, tokenColors: resolved.tokenColors });
+      } catch { /* skip a theme file we can't parse; keep the rest */ }
     }
+    if (!out.length) throw new Error(`${pubExt}: no readable themes (unsupported format?)`);
     return { label: pkg.displayName ?? pubExt, themes: out };
   } finally {
     rmSync(tmp, { recursive: true, force: true });
