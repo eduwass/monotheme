@@ -105,7 +105,8 @@ export function discover(): ThemeEntry[] {
         if (!existsSync(path)) continue;
         const rawLabel = th.label ?? th.id ?? th.path;
         const label = resolveNls(join(root, ext), rawLabel);
-        const appearance: "dark" | "light" = th.uiTheme === "vs" ? "light" : "dark";
+        // uiTheme: vs / hc-light → light; vs-dark / hc-black → dark.
+        const appearance: "dark" | "light" = th.uiTheme === "vs" || th.uiTheme === "hc-light" ? "light" : "dark";
         add({ label, slug: slugify(label), appearance, path, source: ext });
       }
     }
