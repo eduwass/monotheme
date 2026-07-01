@@ -273,21 +273,32 @@ async function runFont(argv: string[]): Promise<void> {
   }
 
   if (sub === "preview") {
-    // font specimen: the SAME snippet in your CURRENT theme's colors, rendered in
-    // each font (+ Nerd Font glyphs for NF fonts) — so you preview the font itself.
-    let theme;
-    if (existsSync(ACTIVE)) theme = loadTheme(ACTIVE);
-    else theme = loadTheme(join(REPO_THEMES, "tokyo-night-storm.json"));
-    const dir = join(CONFIG_HOME, "font-previews");
+    // Font-only specimen (neutral colours, sample text + ligatures + Nerd Font
+    // glyphs) rendered in the ACTUAL font via Satori. Theme-INDEPENDENT, so it's
+    // generated ONCE per font and cached forever — never regenerated on a theme
+    // switch. Used on demand by the picker's "Bigger Preview".
     const cat = catalogWithStatus();
-    if (argv.includes("--all")) {
+    const dir = join(CONFIG_HOME, "font-previews");
+    const { resolveFontFile, resolveNerdFontFile, renderSpecimen } = await import("./font-specimen.ts");
+    const genOne = async (f: (typeof cat)[number]): Promise<string | null> => {
+      const out = join(dir, f.id + ".svg");
+      if (existsSync(out)) return out; // cached (font-only → never stale)
+      // Prefer the Nerd-Font-patched TTF (has icon glyphs), else the base TTF.
+      let data = f.hasNerdFont ? await resolveNerdFontFile(f.id, f.nfAsset) : null;
+      const glyphs = !!data;
+      if (!data) data = await resolveFontFile(f.id, f.name);
+      if (!data) return null; // not on any CDN — no faithful preview available
+      const svg = await renderSpecimen(data, { name: f.name, nerdGlyphs: glyphs });
+      if (!svg) return null;
       mkdirSync(dir, { recursive: true });
+      writeFileSync(out, svg);
+      return out;
+    };
+    if (argv.includes("--all")) {
       const map: Record<string, string> = {};
-      for (const f of cat) {
-        const out = join(dir, f.id + ".svg");
-        writeFileSync(out, toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: !!f.nerdFont && f.setFamily === f.nerdFont }));
-        map[f.id] = out;
-      }
+      const N = 8;
+      for (let i = 0; i < cat.length; i += N)
+        await Promise.all(cat.slice(i, i + N).map(async (f) => { const p = await genOne(f); if (p) map[f.id] = p; }));
       console.log(JSON.stringify(map));
       return;
     }
@@ -295,17 +306,9 @@ async function runFont(argv: string[]): Promise<void> {
     const q = norm(argv[1] ?? "");
     const f = cat.find((x) => norm(x.id) === q || norm(x.name) === q);
     if (!f) { console.error(`theme font: unknown font '${argv[1]}'`); process.exit(1); }
-    // Faithful render: pull the real font file and render glyphs-as-paths via
-    // Satori, so the actual typeface shows even if it's not installed. Falls back
-    // to the name-based SVG when the font isn't on the CDN.
-    const { resolveFontFile, renderSpecimen } = await import("./font-specimen.ts");
-    const data = await resolveFontFile(f.id, f.name);
-    const svg = (data && (await renderSpecimen(theme, data))) || toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: !!f.nerdFont && f.setFamily === f.nerdFont });
-    if (argv.includes("--stdout")) { process.stdout.write(svg); return; }
-    const hd = join(CONFIG_HOME, "font-previews-hd");
-    mkdirSync(hd, { recursive: true });
-    const out = join(hd, f.id + ".svg");
-    writeFileSync(out, svg);
+    const out = await genOne(f);
+    if (!out) { console.error(`theme font: no faithful preview for '${f.name}' (not on the font CDNs)`); process.exit(1); }
+    if (argv.includes("--stdout")) { process.stdout.write(readFileSync(out, "utf8")); return; }
     console.log(out);
     return;
   }

@@ -40,7 +40,7 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 // Common Nerd Font glyphs (branch · folder · file · star · github · code · bolt ·
 // home) — render as icons in a Nerd Font, tofu otherwise, so only add for NF fonts.
-const NF_GLYPHS = "              ";
+export const NF_GLYPHS = "              ";
 
 const DEFAULT_MONO = "ui-monospace, 'SF Mono', Menlo, monospace";
 
