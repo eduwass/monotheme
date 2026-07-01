@@ -292,6 +292,10 @@ async function runFont(argv: string[]): Promise<void> {
       const svg = await renderSpecimen(data, { name: f.name, symbols });
       if (!svg) return null;
       mkdirSync(dir, { recursive: true });
+      // Don't permanently cache a glyph-less render for a Nerd-Font-capable font
+      // (the symbols font may have transiently failed) — write a throwaway so the
+      // next open retries and gets glyphs.
+      if (f.hasNerdFont && !symbols) { const t = join(dir, "_pending.svg"); writeFileSync(t, svg); return t; }
       writeFileSync(out, svg);
       return out;
     };

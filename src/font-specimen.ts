@@ -37,12 +37,12 @@ export async function resolveFontFile(id: string, name: string): Promise<Buffer 
 
 // Download a nerd-fonts release .tar.xz and extract one usable font file (ttf/otf).
 // `preferRe` picks the variant we want; falls back to any Regular, then any file.
-async function fetchNerdRelease(asset: string, cacheFile: string, preferRe: RegExp): Promise<Buffer | null> {
+async function fetchNerdRelease(asset: string, cacheFile: string, preferRe: RegExp, cacheMiss = true): Promise<Buffer | null> {
   mkdirSync(FONT_CACHE, { recursive: true });
   const cached = join(FONT_CACHE, cacheFile);
   if (existsSync(cached)) return readFileSync(cached);
   const miss = cached + ".miss";
-  if (existsSync(miss)) return null;
+  if (cacheMiss && existsSync(miss)) return null;
   const tmp = mkdtempSync(join(tmpdir(), "monotheme-nf-"));
   try {
     const res = await fetch(`https://github.com/ryanoasis/nerd-fonts/releases/latest/download/${asset}.tar.xz`);
@@ -57,7 +57,7 @@ async function fetchNerdRelease(asset: string, cacheFile: string, preferRe: RegE
     writeFileSync(cached, buf);
     return buf;
   } catch {
-    writeFileSync(miss, "");
+    if (cacheMiss) writeFileSync(miss, ""); // symbols: never give up permanently
     return null;
   } finally {
     rmSync(tmp, { recursive: true, force: true });
@@ -77,7 +77,7 @@ let _symbols: Buffer | null | undefined;
  *  fetch a multi-MB per-font archive just to show glyphs. */
 export async function resolveSymbolsFont(): Promise<Buffer | null> {
   if (_symbols !== undefined) return _symbols;
-  _symbols = await fetchNerdRelease("NerdFontsSymbolsOnly", "symbols-nf", /SymbolsNerdFontMono-Regular\.(ttf|otf)$/i);
+  _symbols = await fetchNerdRelease("NerdFontsSymbolsOnly", "symbols-nf", /SymbolsNerdFontMono-Regular\.(ttf|otf)$/i, false);
   return _symbols;
 }
 
@@ -87,29 +87,43 @@ const div = (style: any, children: any) => ({ type: "div", props: { style, child
 // icons). Neutral colours → theme-INDEPENDENT, so it's generated once and cached
 // forever. Rendered in the actual font via Satori (vector paths), so it's faithful
 // even when the font isn't installed.
+// GitHub-Light syntax colours (fixed, theme-independent) for the code snippet.
+const GH: Record<string, string> = {
+  kw: "#cf222e", fn: "#8250df", str: "#0a3069", num: "#0550ae",
+  com: "#6e7781", prop: "#0550ae", punct: "#1f2328", plain: "#1f2328",
+};
+// Hand-tokenized snippet — shows letterforms, ligatures (<=, =>, ++, ===) and colour.
+const CODE: [string, keyof typeof GH][][] = [
+  [["for", "kw"], [" (", "punct"], ["let", "kw"], [" i ", "plain"], ["=", "punct"], [" 0", "num"], ["; i ", "plain"], ["<=", "punct"], [" 10", "num"], ["; i", "plain"], ["++", "punct"], [") {", "punct"]],
+  [["  sum ", "plain"], ["+=", "punct"], [" items", "plain"], ["[", "punct"], ["i", "plain"], ["]", "punct"], [" ?? ", "punct"], ["0", "num"]],
+  [["}", "punct"], [" ", "plain"], ["// => done", "com"]],
+];
+
 export async function renderSpecimen(data: Buffer, opts: { name: string; symbols?: Buffer | null }): Promise<string | null> {
-  // Google-Fonts-style specimen: small name, then one large sample sentence in the
-  // font (same sentence for every font, so you compare typefaces directly). A
-  // subtle ligature/glyph line at the bottom for the programming-font angle.
-  const bg = "#fbfbfa", ink = "#1c1c21", sub = "#9a9aa2", green = "#3f9e57", accent = "#5b6bd6";
+  // Specimen: name, a big sample sentence (compare typefaces), a small GitHub-Light
+  // syntax-highlighted snippet (see code + ligatures + colour), and the NF glyph row.
+  // All theme-INDEPENDENT → generated once and cached forever.
+  const bg = "#ffffff", ink = "#1c1c21", sub = "#9a9aa2", accent = "#5b6bd6";
   const row = (color: string, size: number, extra: any, text: string) =>
     div({ display: "flex", color, fontSize: size, ...extra }, text);
-  const children = [
-    row(sub, 14, { marginBottom: 16 }, opts.name),
-    row(ink, 33, { marginBottom: 16, width: 452, lineHeight: 1.15 }, "Whereas recognition of the inherent dignity"),
-    row(green, 18, { whiteSpace: "pre" }, "-> => != === >= <= |>   0123 (){}[]"),
+  const codeLine = (toks: [string, keyof typeof GH][]) =>
+    div({ display: "flex", height: 21 }, toks.map(([t, k]) => div({ color: GH[k], whiteSpace: "pre" }, t)));
+  const children: any[] = [
+    row(sub, 14, { marginBottom: 14 }, opts.name),
+    row(ink, 30, { marginBottom: 18, width: 456, lineHeight: 1.15 }, "Whereas recognition of the inherent dignity"),
+    div({ display: "flex", flexDirection: "column", fontSize: 15 }, CODE.map(codeLine)),
   ];
   // glyph row renders in the shared Symbols font, so it shows for any NF-capable
   // font without downloading that font's full patched archive.
-  if (opts.symbols) children.push(div({ display: "flex", color: accent, fontSize: 24, marginTop: 16, fontFamily: "Sym", whiteSpace: "pre" }, NF_GLYPHS));
+  if (opts.symbols) children.push(div({ display: "flex", color: accent, fontSize: 22, marginTop: 16, fontFamily: "Sym", whiteSpace: "pre" }, NF_GLYPHS));
   const tree = div(
-    { display: "flex", flexDirection: "column", justifyContent: "center", width: 520, height: 340, backgroundColor: bg, fontFamily: "Spec", padding: 38 },
+    { display: "flex", flexDirection: "column", justifyContent: "center", width: 520, height: 400, backgroundColor: bg, fontFamily: "Spec", padding: 36 },
     children,
   );
   const fonts: any[] = [{ name: "Spec", data, weight: 400, style: "normal" }];
   if (opts.symbols) fonts.push({ name: "Sym", data: opts.symbols, weight: 400, style: "normal" });
   try {
-    return await satori(tree as any, { width: 520, height: 340, fonts });
+    return await satori(tree as any, { width: 520, height: 400, fonts });
   } catch {
     return null;
   }
