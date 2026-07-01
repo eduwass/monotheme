@@ -15,6 +15,6 @@ export default defineTarget({
         : c.setJson(settings, "workbench.colorTheme", c.entry.label)
           ? `colorTheme = ${c.entry.label}`
           : "(not installed)";
-    return color + applyVscodeFonts(c, settings);
+    return color + applyVscodeFonts(c, settings, c.home(".cursor", "extensions"));
   },
 });
