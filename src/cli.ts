@@ -254,8 +254,9 @@ switch (cmd) {
     if (!id) { console.error("usage: theme add <publisher.extension>   (find ids via: theme browse <query>)"); process.exit(1); }
     const { addExtension } = await import("./market.ts");
     try {
-      console.log(`fetching ${id}…`);
       const { added, label } = await addExtension(id);
+      if (rest.includes("--json")) { console.log(JSON.stringify({ added, label, set: added[0] ?? null })); break; }
+      console.log(`fetching ${id}…`);
       for (const s of added) console.log(`  ✓ ${s}`);
       console.log(`\nadded ${added.length} theme(s) from ${label} → ~/.config/monotheme/themes/`);
       console.log(`set one with:  theme set ${added[0]}`);
