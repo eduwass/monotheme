@@ -184,6 +184,16 @@ function runFont(argv: string[]): void {
   const fonts: FontsConfig = existsSync(FONTS) ? (JSON5.parse(readFileSync(FONTS, "utf8")) as FontsConfig) : {};
 
   if (sub === "show") {
+    if (rest.includes("--json") || argv.includes("--json")) {
+      // stable shape for the Raycast extension: resolved family/size per role,
+      // plus whether the role is explicitly configured vs inherited from mono.
+      const data = FONT_ROLES.map((role) => {
+        const r = resolveFont(fonts, role);
+        return { role, family: r.family ?? null, size: r.size ?? null, configured: fonts[role] !== undefined };
+      });
+      console.log(JSON.stringify(data));
+      return;
+    }
     if (!existsSync(FONTS)) { console.log("(no fonts.json — fonts are opt-in; try: theme font set mono \"Berkeley Mono\" 13)"); return; }
     for (const role of FONT_ROLES) {
       const r = resolveFont(fonts, role);
