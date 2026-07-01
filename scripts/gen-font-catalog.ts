@@ -21,6 +21,15 @@ const nf = (JSON.parse(readFileSync(join(V, "nerd-fonts.json"), "utf8")) as any)
 
 const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const stripNF = (s: string) => s.replace(/\s*nerd font.*$/i, "");
+// The real installed Nerd Font family is `<patchedName> Nerd Font` (e.g.
+// "GeistMono Nerd Font"). imagePreviewFont is a truncated *display* string that
+// sometimes abbreviates to "… NF" (e.g. "GeistMono NF"), which never matches the
+// installed font → we'd fall back to a non-installed base name. Build it properly.
+const nfFamily = (patched?: string, fallback?: string): string | undefined => {
+  const p = (patched ?? "").trim();
+  if (!p) return fallback;
+  return /nerd font$/i.test(p) ? p : `${p} Nerd Font`;
+};
 
 // index nerd-fonts by every name we might match on
 const nfIndex = new Map<string, any>();
@@ -65,7 +74,7 @@ for (const [alias, p] of Object.entries(pf)) {
     zerostyle: p.zerostyle,
     website: p.website,
     ...(match
-      ? { nerdFont: match.imagePreviewFont, cask: `font-${match.caskName}-nerd-font`, nfAsset: match.folderName }
+      ? { nerdFont: nfFamily(match.patchedName, match.imagePreviewFont), cask: `font-${match.caskName}-nerd-font`, nfAsset: match.folderName }
       : {}),
   });
 }
@@ -79,7 +88,7 @@ for (const f of nf) {
     ligatures: false,
     mono: f.isMonospaced !== false,
     license: f.licenseId,
-    nerdFont: f.imagePreviewFont,
+    nerdFont: nfFamily(f.patchedName, f.imagePreviewFont),
     cask: `font-${f.caskName}-nerd-font`,
     nfAsset: f.folderName,
   });
