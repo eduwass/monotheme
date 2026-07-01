@@ -44,6 +44,7 @@ export async function searchThemes(query: string, opts: { pageSize?: number; pag
     method: "POST",
     headers: { Accept: "application/json;api-version=3.0-preview.1", "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
   });
   if (!res.ok) throw new Error(`marketplace query failed (${res.status})`);
   const data = (await res.json()) as any;
@@ -113,7 +114,9 @@ export async function fetchExtensionThemes(pubExt: string): Promise<{ label: str
   const tmp = mkdtempSync(join(tmpdir(), "monotheme-vsix-"));
   try {
     const vsix = join(tmp, "ext.vsix");
-    const res = await fetch(url);
+    // Cap the download: some "theme" extensions (PowerShell, C/C++) are 100+ MB —
+    // not worth fetching just for a preview. Time out so they fail fast and hide.
+    const res = await fetch(url, { signal: AbortSignal.timeout(25000) });
     if (!res.ok) throw new Error(`download failed (${res.status})`);
     writeFileSync(vsix, Buffer.from(await res.arrayBuffer()));
     try { execSync(`unzip -oq "${vsix}" -d "${tmp}"`, { stdio: "ignore" }); }

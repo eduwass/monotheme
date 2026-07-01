@@ -189,22 +189,28 @@ switch (cmd) {
       const cache = join(rdir, slugify(id) + ".svg");
       const meta = join(rdir, slugify(id) + ".json"); // sidecar: dominant colour
       let svg: string;
-      let info: { hue: string; accent: string; type: string; slug: string };
+      let info: { hue: string; accent: string; type: string; slug: string; slugs: string[] };
       if (existsSync(cache) && existsSync(meta)) {
         svg = readFileSync(cache, "utf8");
-        info = JSON.parse(readFileSync(meta, "utf8"));
+        const cached = JSON.parse(readFileSync(meta, "utf8"));
+        info = { ...cached, slugs: cached.slugs ?? (cached.slug ? [cached.slug] : []) }; // back-compat
       } else {
-        const { fetchExtensionThemes } = await import("./market.ts");
-        const { themes } = await fetchExtensionThemes(id);
-        if (!themes.length) { console.error(`theme preview: ${id} contributes no themes`); process.exit(1); }
-        const th = themes[0];
-        const themeObj = { name: th.name, type: th.type, colors: th.colors, tokenColors: th.tokenColors } as any;
-        svg = toPreviewSvg(themeObj, { fontFamily: curFont });
-        const d = dominantColor(themeObj);
-        info = { hue: d.hue, accent: d.hex, type: th.type, slug: th.slug };
-        mkdirSync(rdir, { recursive: true });
-        writeFileSync(cache, svg);
-        writeFileSync(meta, JSON.stringify(info));
+        try {
+          const { fetchExtensionThemes } = await import("./market.ts");
+          const { themes } = await fetchExtensionThemes(id);
+          if (!themes.length) { console.error(`theme preview: ${id} contributes no themes`); process.exit(1); }
+          const th = themes[0];
+          const themeObj = { name: th.name, type: th.type, colors: th.colors, tokenColors: th.tokenColors } as any;
+          svg = toPreviewSvg(themeObj, { fontFamily: curFont });
+          const d = dominantColor(themeObj);
+          info = { hue: d.hue, accent: d.hex, type: th.type, slug: th.slug, slugs: themes.map((t) => t.slug) };
+          mkdirSync(rdir, { recursive: true });
+          writeFileSync(cache, svg);
+          writeFileSync(meta, JSON.stringify(info));
+        } catch (e) {
+          console.error(`theme preview: ${(e as Error).message}`);
+          process.exit(1);
+        }
       }
       if (rest.includes("--json")) { console.log(JSON.stringify({ path: cache, ...info })); break; }
       if (rest.includes("--stdout")) { process.stdout.write(svg); break; }
