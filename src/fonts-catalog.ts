@@ -1,52 +1,25 @@
-// A curated catalog of programming fonts, so the CLI and the Raycast picker can
-// offer good defaults (with Nerd Font variants + one-tap install) instead of
-// making you type a family name. Prefer the Nerd Font variant when present — it's
-// a superset of the base font plus the icon glyphs that prompts, file explorers
-// (yazi/neovim/lazygit) and statuslines rely on.
-//
-// `nerdFont` is the family string to set for the patched build; `name` is the
-// plain family. `cask` is the Homebrew cask id for the Nerd Font build (macOS).
-// Family/cask names verified against the Homebrew fonts tap; if one drifts it's a
-// one-line fix here.
-import { homedir } from "node:os";
+// The font catalog + install/detection. The DATA is generated (reused from the
+// programmingfonts + nerd-fonts open-source catalogs — see scripts/gen-font-
+// catalog.ts); this file only adds runtime logic: is-it-installed detection,
+// Nerd-Font-preferred family resolution, and install (Homebrew cask or the
+// nerd-fonts .tar.xz release asset, cross-platform).
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { readdirSync } from "node:fs";
+import { readdirSync, mkdirSync } from "node:fs";
+import { execSync } from "node:child_process";
+import { CATALOG, type CatalogEntry } from "./fonts-catalog.gen.ts";
 
-export interface CatalogFont {
-  id: string;
-  name: string;
-  nerdFont?: string;
-  cask?: string;
-  ligatures?: boolean;
-  note?: string;
-}
+export type CatalogFont = CatalogEntry;
+export const FONT_CATALOG: CatalogFont[] = CATALOG;
 
-export const FONT_CATALOG: CatalogFont[] = [
-  { id: "jetbrains-mono", name: "JetBrains Mono", nerdFont: "JetBrainsMono Nerd Font", cask: "font-jetbrains-mono-nerd-font", ligatures: true },
-  { id: "fira-code", name: "Fira Code", nerdFont: "FiraCode Nerd Font", cask: "font-fira-code-nerd-font", ligatures: true },
-  { id: "cascadia-code", name: "Cascadia Code", nerdFont: "CaskaydiaCove Nerd Font", cask: "font-caskaydia-cove-nerd-font", ligatures: true },
-  { id: "hack", name: "Hack", nerdFont: "Hack Nerd Font", cask: "font-hack-nerd-font" },
-  { id: "iosevka", name: "Iosevka", nerdFont: "Iosevka Nerd Font", cask: "font-iosevka-nerd-font", ligatures: true },
-  { id: "source-code-pro", name: "Source Code Pro", nerdFont: "SauceCodePro Nerd Font", cask: "font-sauce-code-pro-nerd-font" },
-  { id: "meslo-lg", name: "Meslo LG", nerdFont: "MesloLGS Nerd Font", cask: "font-meslo-lg-nerd-font", note: "the p10k / powerline default" },
-  { id: "monaspace", name: "Monaspace Neon", nerdFont: "Monaspice Ne Nerd Font", cask: "font-monaspace-nerd-font", ligatures: true, note: "GitHub's superfamily (Neon/Argon/Xenon/Radon/Krypton)" },
-  { id: "victor-mono", name: "Victor Mono", nerdFont: "VictorMono Nerd Font", cask: "font-victor-mono-nerd-font", ligatures: true, note: "cursive italics" },
-  { id: "commit-mono", name: "Commit Mono", nerdFont: "CommitMono Nerd Font", cask: "font-commit-mono-nerd-font", ligatures: true },
-  { id: "geist-mono", name: "Geist Mono", nerdFont: "GeistMono Nerd Font", cask: "font-geist-mono-nerd-font" },
-  { id: "ibm-plex-mono", name: "IBM Plex Mono", nerdFont: "BlexMono Nerd Font", cask: "font-blex-mono-nerd-font" },
-  { id: "maple-mono", name: "Maple Mono", nerdFont: "Maple Mono NF", cask: "font-maple-mono-nf", ligatures: true, note: "rounded, smooth" },
-  { id: "departure-mono", name: "Departure Mono", cask: "font-departure-mono", note: "pixel / bitmap style; no Nerd Font build" },
-  { id: "berkeley-mono", name: "Berkeley Mono", ligatures: true, note: "paid (berkeleygraphics.com) — no Homebrew cask" },
-];
-
-// Font directories to scan for installed families (best-effort, no fontconfig
-// dependency). Homebrew font casks symlink into ~/Library/Fonts on macOS.
 function fontDirs(): string[] {
   const home = homedir();
   return process.platform === "darwin"
     ? ["/System/Library/Fonts", "/Library/Fonts", join(home, "Library", "Fonts")]
     : [join(home, ".local", "share", "fonts"), join(home, ".fonts"), "/usr/share/fonts", "/usr/local/share/fonts"];
 }
+const userFontDir = () =>
+  process.platform === "darwin" ? join(homedir(), "Library", "Fonts") : join(homedir(), ".local", "share", "fonts");
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -67,7 +40,7 @@ function installedFontFiles(): string[] {
 }
 
 /** Best-effort: is any of these family names installed? Matches the de-spaced
- *  family against installed font filenames (how cask-installed fonts land). */
+ *  family against installed font filenames (how cask/tar.xz fonts land). */
 export function isFamilyInstalled(...families: (string | undefined)[]): boolean {
   const keys = families.filter((f): f is string => !!f).map(norm);
   if (!keys.length) return false;
@@ -75,12 +48,59 @@ export function isFamilyInstalled(...families: (string | undefined)[]): boolean 
   return files.some((f) => keys.some((k) => f.includes(k)));
 }
 
-/** Catalog augmented with install status + the family string to actually set
- *  (Nerd Font variant preferred). */
+/** Catalog augmented with install status + the family to actually set. Nerd Font
+ *  variant is preferred when installed (superset: base glyphs + icons that
+ *  terminal prompts / file explorers need). */
 export function catalogWithStatus() {
-  return FONT_CATALOG.map((f) => ({
-    ...f,
-    installed: isFamilyInstalled(f.nerdFont, f.name),
-    setFamily: f.nerdFont && isFamilyInstalled(f.nerdFont) ? f.nerdFont : f.name,
-  }));
+  return FONT_CATALOG.map((f) => {
+    const nfInstalled = isFamilyInstalled(f.nerdFont);
+    return {
+      ...f,
+      installed: nfInstalled || isFamilyInstalled(f.name),
+      hasNerdFont: !!f.nerdFont,
+      setFamily: f.nerdFont && nfInstalled ? f.nerdFont : f.name,
+    };
+  });
+}
+
+export function findFont(idOrName: string): CatalogFont | undefined {
+  const q = norm(idOrName);
+  return FONT_CATALOG.find((f) => norm(f.id) === q || norm(f.name) === q);
+}
+
+/** Resolve a user-supplied font (catalog id OR family name) to the family string
+ *  to actually set — preferring the Nerd Font variant when it's installed (safe
+ *  everywhere; a superset). Unknown/custom fonts pass through unchanged. */
+export function resolveFamily(input: string): string {
+  const f = findFont(input);
+  if (!f) return input;
+  return f.nerdFont && isFamilyInstalled(f.nerdFont) ? f.nerdFont : f.name;
+}
+
+/** Install a catalog font, preferring its Nerd Font variant. macOS → Homebrew
+ *  cask; otherwise (or if brew missing) → download the nerd-fonts .tar.xz release
+ *  asset and extract into the user font dir. Throws on failure. */
+export function installFont(font: CatalogFont): { method: string; family: string } {
+  const hasBrew = (() => { try { execSync("command -v brew", { stdio: "ignore" }); return true; } catch { return false; } })();
+
+  if (process.platform === "darwin" && hasBrew && font.cask) {
+    execSync(`brew install --cask ${font.cask}`, { stdio: "inherit" });
+    return { method: `brew (${font.cask})`, family: font.nerdFont ?? font.name };
+  }
+
+  if (font.nfAsset) {
+    // cross-platform: fetch the nerd-fonts release asset and unpack .ttf/.otf.
+    const url = `https://github.com/ryanoasis/nerd-fonts/releases/latest/download/${font.nfAsset}.tar.xz`;
+    const dir = userFontDir();
+    mkdirSync(dir, { recursive: true });
+    const tmp = join(tmpdir(), `monotheme-${font.nfAsset}.tar.xz`);
+    execSync(`curl -fsSL -o "${tmp}" "${url}"`, { stdio: "inherit" });
+    // extract only font files, flatten into the font dir
+    execSync(`tar -xJf "${tmp}" -C "${dir}" --wildcards '*.ttf' '*.otf' 2>/dev/null || tar -xJf "${tmp}" -C "${dir}"`, { stdio: "inherit", shell: "/bin/bash" });
+    execSync(`rm -f "${tmp}"`, { stdio: "ignore" });
+    if (process.platform === "linux") { try { execSync("fc-cache -f", { stdio: "ignore" }); } catch {} }
+    return { method: `nerd-fonts release (${font.nfAsset}.tar.xz)`, family: font.nerdFont ?? font.name };
+  }
+
+  throw new Error(`${font.name}: no Homebrew cask or Nerd Font asset to install from`);
 }

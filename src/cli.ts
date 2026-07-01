@@ -20,7 +20,7 @@ import { toGhostty } from "./targets/ghostty.ts";
 import { raycastImportUrl } from "./formats/raycast.ts";
 import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, migrateConfigHome, hydrateDefaults } from "./paths.ts";
 import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
-import { FONT_CATALOG, catalogWithStatus } from "./fonts-catalog.ts";
+import { catalogWithStatus, findFont, installFont, resolveFamily } from "./fonts-catalog.ts";
 import JSON5 from "json5";
 
 // One-time move of legacy clone-root state into ~/.config/monotheme/ (no-op after),
@@ -208,23 +208,26 @@ function runFont(argv: string[]): void {
   if (sub === "catalog") {
     const cat = catalogWithStatus();
     if (rest.includes("--json") || argv.includes("--json")) { console.log(JSON.stringify(cat)); return; }
+    const nfOnly = rest.includes("--nerd") || argv.includes("--nerd");
     for (const f of cat) {
-      console.log(`  ${f.installed ? "✓" : "⤓"} ${f.id.padEnd(16)} ${f.name}${f.ligatures ? "  ~lig" : ""}${f.note ? `  — ${f.note}` : ""}`);
+      if (nfOnly && !f.hasNerdFont) continue;
+      console.log(`  ${f.installed ? "✓" : "⤓"} ${f.id.padEnd(18)} ${f.name}${f.hasNerdFont ? "  ◆NF" : ""}${f.ligatures ? "  ~lig" : ""}`);
     }
-    console.log(`\n✓ installed · ⤓ available (theme font install <id>)`);
+    console.log(`\n${cat.length} fonts · ✓ installed · ⤓ available · ◆NF has Nerd Font (theme font install <id>)`);
     return;
   }
 
   if (sub === "install") {
-    const id = (argv[1] ?? "").toLowerCase();
-    const font = FONT_CATALOG.find((f) => f.id === id || f.name.toLowerCase() === id);
+    const font = findFont(argv[1] ?? "");
     if (!font) { console.error(`theme font: unknown font '${argv[1]}' (try: theme font catalog)`); process.exit(1); }
-    if (!font.cask) { console.error(`${font.name}: no Homebrew cask${font.note ? ` — ${font.note}` : ""}`); process.exit(1); }
-    if (process.platform !== "darwin") { console.error("theme font install: macOS/Homebrew only"); process.exit(1); }
-    console.log(`installing ${font.name} (${font.cask})…`);
-    try { execSync(`brew install --cask ${font.cask}`, { stdio: "inherit" }); }
-    catch { console.error("theme font install: brew failed"); process.exit(1); }
-    console.log(`  ✓ installed ${font.name}`);
+    console.log(`installing ${font.name}${font.nerdFont ? " (Nerd Font variant)" : ""}…`);
+    try {
+      const r = installFont(font);
+      console.log(`  ✓ installed ${font.name} via ${r.method}`);
+    } catch (e) {
+      console.error(`theme font install: ${(e as Error).message}`);
+      process.exit(1);
+    }
     return;
   }
 
@@ -244,6 +247,8 @@ function runFont(argv: string[]): void {
     let family: string | undefined = positional[0];
     if (size === undefined && positional[1] !== undefined && /^\d+(\.\d+)?$/.test(positional[1])) size = Number(positional[1]);
     if (family === "") family = undefined;
+    // DWIM: a catalog id/name resolves to its Nerd-Font-preferred family string.
+    if (family !== undefined) family = resolveFamily(family);
     if (family === undefined && size === undefined) {
       console.error(`usage: theme font set "<family>" [size]            # everywhere\n       theme font set <${FONT_ROLES.join("|")}> "<family>" [size]`);
       process.exit(1);
