@@ -6,7 +6,7 @@
 //   theme init                 re-apply the active theme (run from shell rc)
 //   theme raycast              open the active theme as a Raycast import (one click)
 //   theme check                self-check (no writes)
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { loadTheme, stripAlpha } from "./load.ts";
@@ -90,6 +90,24 @@ function propagate(canonical: string): void {
   } catch {
     console.log(`  · ${peer.peer} not synced (unreachable) — it'll match next time it's set there`);
   }
+}
+
+// Editors that expose an `--install-extension` CLI. A Marketplace theme is only
+// colour DATA for terminals/etc.; Cursor/VSCode need the theme as an installed
+// extension for `workbench.colorTheme` to resolve, so we install it into whichever
+// editor CLIs are present (best-effort). discover() then prefers that editor copy.
+function editorClis(): { name: string; cmd: string }[] {
+  return [{ name: "Cursor", cmd: "cursor" }, { name: "VS Code", cmd: "code" }].filter((e) => {
+    try { execSync(`command -v ${e.cmd}`, { stdio: "ignore" }); return true; } catch { return false; }
+  });
+}
+function editorExtension(pubExt: string, verb: "install" | "uninstall"): string[] {
+  const done: string[] = [];
+  const flag = verb === "install" ? " --force" : "";
+  for (const e of editorClis()) {
+    try { execSync(`${e.cmd} --${verb}-extension ${pubExt}${flag}`, { stdio: "ignore", timeout: 120000 }); done.push(e.name); } catch { /* not present / failed */ }
+  }
+  return done;
 }
 
 switch (cmd) {
@@ -275,12 +293,37 @@ switch (cmd) {
     const { addExtension } = await import("./market.ts");
     try {
       const { added, label } = await addExtension(id);
-      if (rest.includes("--json")) { console.log(JSON.stringify({ added, label, set: added[0] ?? null })); break; }
+      // Also install the actual extension into Cursor/VSCode so their colorTheme
+      // resolves (they need the extension, not just the vendored colour data).
+      const editors = editorExtension(id!, "install");
+      if (rest.includes("--json")) { console.log(JSON.stringify({ added, label, set: added[0] ?? null, editors })); break; }
       console.log(`fetching ${id}…`);
       for (const s of added) console.log(`  ✓ ${s}`);
       console.log(`\nadded ${added.length} theme(s) from ${label} → ~/.config/monotheme/themes/`);
+      if (editors.length) console.log(`  ✓ installed extension in ${editors.join(", ")} (reload the editor if the theme doesn't appear)`);
       console.log(`set one with:  theme set ${added[0]}`);
     } catch (e) { console.error(`theme add: ${(e as Error).message}`); process.exit(1); }
+    break;
+  }
+  case "remove": {
+    // Uninstall a theme the user added: delete the vendored colour copy, and if it
+    // came from an editor extension, uninstall that extension too. Won't touch repo
+    // built-ins. `theme remove <slug>`.
+    const slug = rest.find((r) => !r.startsWith("--"));
+    if (!slug) { console.error("usage: theme remove <slug>"); process.exit(1); }
+    const json = rest.includes("--json");
+    const e = resolveTheme(slug);
+    const removed: string[] = [];
+    const vendored = join(USER_THEMES, slug + ".json");
+    if (existsSync(vendored)) { rmSync(vendored); removed.push("vendored copy"); }
+    let editors: string[] = [];
+    if (e && e.source !== "local" && e.source !== "file") {
+      const m = /^(.+?\..+?)-\d+\.\d+/.exec(e.source); // "<pub>.<ext>-x.y.z-…" → pub.ext
+      if (m) editors = editorExtension(m[1], "uninstall");
+    }
+    if (json) { console.log(JSON.stringify({ removed, editors })); break; }
+    if (!removed.length && !editors.length) { console.log(`nothing to remove for '${slug}' (not an added theme — repo built-ins can't be removed)`); break; }
+    console.log(`removed '${slug}'${removed.length ? ` (${removed.join(", ")})` : ""}${editors.length ? `; uninstalled extension from ${editors.join(", ")}` : ""}`);
     break;
   }
   case "font": {
@@ -292,7 +335,7 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("usage: theme <list|set|current|init|sync|browse|add|font|raycast|check> [name]");
+    console.log("usage: theme <list|set|current|init|sync|browse|add|remove|font|raycast|check> [name]");
     process.exit(cmd ? 1 : 0);
 }
 
