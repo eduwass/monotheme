@@ -49,10 +49,14 @@ export async function searchThemes(query: string, opts: { pageSize?: number; pag
   if (!res.ok) throw new Error(`marketplace query failed (${res.status})`);
   const data = (await res.json()) as any;
   const exts = data.results?.[0]?.extensions ?? [];
-  // The "Themes" category also holds icon / product-icon themes (Material Icon Theme
-  // etc.) which contribute no colour theme — drop them by tag so they don't pollute.
+  // The "Themes" category also holds (a) icon / product-icon themes and (b) language/
+  // tool extensions that ship a theme as a side feature (PowerShell, C/C++, …) — both
+  // pollute a theme browser and often render oddly. Keep only theme-focused extensions,
+  // like vscodethemes.com does.
+  const TOOL_CATS = new Set(["Programming Languages", "Debuggers", "Linters", "Formatters", "Language Packs", "Extension Packs", "Testing", "Notebooks", "Data Science", "Machine Learning", "Azure", "Snippets"]);
   const isIconTheme = (e: any) => (e.tags ?? []).some((t: string) => /(^|-)icon-theme$/i.test(t) || t.toLowerCase() === "icon-theme" || t.toLowerCase() === "product-icon-theme");
-  return exts.filter((e: any) => !isIconTheme(e)).map((e: any): MarketTheme => ({
+  const isToolExtension = (e: any) => (e.categories ?? []).some((c: string) => TOOL_CATS.has(c));
+  return exts.filter((e: any) => !isIconTheme(e) && !isToolExtension(e)).map((e: any): MarketTheme => ({
     publisher: e.publisher.publisherName,
     extension: e.extensionName,
     id: `${e.publisher.publisherName}.${e.extensionName}`,
