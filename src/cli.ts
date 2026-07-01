@@ -189,7 +189,7 @@ switch (cmd) {
       const cache = join(rdir, slugify(id) + ".svg");
       const meta = join(rdir, slugify(id) + ".json"); // sidecar: dominant colour
       let svg: string;
-      let info: { hue: string; accent: string };
+      let info: { hue: string; accent: string; type: string };
       if (existsSync(cache) && existsSync(meta)) {
         svg = readFileSync(cache, "utf8");
         info = JSON.parse(readFileSync(meta, "utf8"));
@@ -201,7 +201,7 @@ switch (cmd) {
         const themeObj = { name: th.name, type: th.type, colors: th.colors, tokenColors: th.tokenColors } as any;
         svg = toPreviewSvg(themeObj, { fontFamily: curFont });
         const d = dominantColor(themeObj);
-        info = { hue: d.hue, accent: d.hex };
+        info = { hue: d.hue, accent: d.hex, type: th.type };
         mkdirSync(rdir, { recursive: true });
         writeFileSync(cache, svg);
         writeFileSync(meta, JSON.stringify(info));
