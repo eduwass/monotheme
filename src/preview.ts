@@ -72,7 +72,6 @@ export function toPreviewSvg(theme: VscodeTheme, opts: PreviewOpts = {}): string
   const { p, styles } = specimenStyles(theme);
 
   const W = 480, H = 300, pad = 16, bar = 30, lh = 21, fs = 13;
-  const dots = [p.ansi[1], p.ansi[3], p.ansi[2]];
 
   const rows: Tok[][] = opts.nerdGlyphs ? [...SNIPPET, [[`// ${NF_GLYPHS}`, "com"]]] : SNIPPET;
   const lines = rows.map((line, i) => {
@@ -94,8 +93,7 @@ export function toPreviewSvg(theme: VscodeTheme, opts: PreviewOpts = {}): string
   <rect width="${W}" height="${bar}" rx="10" fill="${p.bgPanel}"/>
   <rect y="${bar - 10}" width="${W}" height="10" fill="${p.bgPanel}"/>
   <line x1="0" y1="${bar}" x2="${W}" y2="${bar}" stroke="${p.border}" stroke-width="1"/>
-  ${dots.map((c, i) => `<circle cx="${16 + i * 16}" cy="${bar / 2}" r="5" fill="${c}"/>`).join("")}
-  <text x="${W / 2}" y="${bar / 2 + 4}" text-anchor="middle" font-family="ui-sans-serif, system-ui" font-size="11" fill="${p.fgMuted}">main.js</text>
+  <text x="${pad}" y="${bar / 2 + 4}" font-family="ui-sans-serif, system-ui" font-size="11" fill="${p.fgMuted}">main.js</text>
   ${lines}
 </svg>`;
 }
