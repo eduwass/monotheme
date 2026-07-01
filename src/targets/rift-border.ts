@@ -1,6 +1,6 @@
 import { defineTarget } from "../target-kit.ts";
 // VSCode theme -> rift overlay accent colors (focus border + cursor halo + halo fx).
-// The custom renderer (scripts/mac/rift/focus-border-renderer.swift) reads its
+// The custom renderer (scripts/mac/rift/cursor-halo-renderer.swift) reads its
 // config from ~/.local/state/rift/ui.json and WATCHES the file, hot-reloading
 // border + halo on change — so syncing is just a merge-write of the color keys.
 // All colors are 6-digit "#RRGGBB" (parseHexColor; alpha ignored).
