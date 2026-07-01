@@ -78,8 +78,12 @@ export function project(theme: VscodeTheme): Projection {
   const t = theme.tokenColors;
   const warnings: string[] = [];
 
-  const bg = pick(c, ["editor.background", "terminal.background"]) ?? "#000000";
-  const fg = pick(c, ["editor.foreground", "terminal.foreground", "foreground"]) ?? "#ffffff";
+  // Fall back on the theme's declared type, not always dark: some themes (e.g. the
+  // built-in "Light+" / "Light High Contrast") omit editor.background and rely on
+  // VS Code's programmatic default, so a hardcoded black bg renders a light theme dark.
+  const light = theme.type === "light";
+  const bg = pick(c, ["editor.background", "terminal.background"]) ?? (light ? "#ffffff" : "#000000");
+  const fg = pick(c, ["editor.foreground", "terminal.foreground", "foreground"]) ?? (light ? "#1f2328" : "#ffffff");
 
   // ANSI: prefer authored terminal.ansi*, else derive from syntax palette + warn.
   let ansi: string[];
