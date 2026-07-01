@@ -160,6 +160,43 @@ switch (cmd) {
     console.log(`\nsynced ${n} theme(s) → ${USER_THEMES.replace(process.env.HOME || "~", "~")}`);
     break;
   }
+  case "preview": {
+    // render a code-sample preview card (SVG) for any theme — works for custom /
+    // local themes too, since it's generated from the theme's own colors.
+    const { toPreviewSvg } = await import("./preview.ts");
+    const arg = rest.find((r) => !r.startsWith("--"));
+    let theme;
+    if (arg) {
+      const e = resolveTheme(arg);
+      if (!e) { console.error(`theme: unknown theme '${arg}' (try: theme list)`); process.exit(1); }
+      theme = loadTheme(e.path); theme.type = e.appearance as "dark" | "light";
+    } else if (existsSync(ACTIVE)) theme = loadTheme(ACTIVE);
+    else { console.error("theme: no theme given and none active"); process.exit(1); }
+    const dir = join(CONFIG_HOME, "previews");
+    if (rest.includes("--all")) {
+      // generate previews for every discovered theme; print {slug: path} for the
+      // Raycast grid to consume in one shot.
+      mkdirSync(dir, { recursive: true });
+      const map: Record<string, string> = {};
+      for (const e of discover()) {
+        try {
+          const th = loadTheme(e.path); th.type = e.appearance as "dark" | "light";
+          const out = join(dir, e.slug + ".svg");
+          writeFileSync(out, toPreviewSvg(th));
+          map[e.slug] = out;
+        } catch { /* skip unreadable */ }
+      }
+      console.log(JSON.stringify(map));
+      break;
+    }
+    const svg = toPreviewSvg(theme);
+    if (rest.includes("--stdout")) { process.stdout.write(svg); break; }
+    mkdirSync(dir, { recursive: true });
+    const out = join(dir, slugify(theme.name) + ".svg");
+    writeFileSync(out, svg);
+    console.log(out);
+    break;
+  }
   case "browse": {
     // search the VS Code Marketplace for themes (the source vscodethemes.com indexes)
     const q = rest.filter((r) => !r.startsWith("--")).join(" ");
