@@ -279,16 +279,17 @@ async function runFont(argv: string[]): Promise<void> {
     // switch. Used on demand by the picker's "Bigger Preview".
     const cat = catalogWithStatus();
     const dir = join(CONFIG_HOME, "font-previews");
-    const { resolveFontFile, resolveNerdFontFile, renderSpecimen } = await import("./font-specimen.ts");
+    const { resolveFontFile, resolveNerdFontFile, resolveSymbolsFont, renderSpecimen } = await import("./font-specimen.ts");
     const genOne = async (f: (typeof cat)[number]): Promise<string | null> => {
       const out = join(dir, f.id + ".svg");
       if (existsSync(out)) return out; // cached (font-only → never stale)
-      // Prefer the Nerd-Font-patched TTF (has icon glyphs), else the base TTF.
-      let data = f.hasNerdFont ? await resolveNerdFontFile(f.id, f.nfAsset) : null;
-      const glyphs = !!data;
-      if (!data) data = await resolveFontFile(f.id, f.name);
+      // Typeface: base CDN first (small + fast), else the Nerd-Font build (covers
+      // fonts not on the base CDN). Glyph row uses the shared symbols font.
+      let data = await resolveFontFile(f.id, f.name);
+      if (!data && f.hasNerdFont) data = await resolveNerdFontFile(f.id, f.nfAsset);
       if (!data) return null; // not on any CDN — no faithful preview available
-      const svg = await renderSpecimen(data, { name: f.name, nerdGlyphs: glyphs });
+      const symbols = f.hasNerdFont ? await resolveSymbolsFont() : null;
+      const svg = await renderSpecimen(data, { name: f.name, symbols });
       if (!svg) return null;
       mkdirSync(dir, { recursive: true });
       writeFileSync(out, svg);
