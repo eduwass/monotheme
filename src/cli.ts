@@ -285,7 +285,7 @@ function runFont(argv: string[]): void {
       const map: Record<string, string> = {};
       for (const f of cat) {
         const out = join(dir, f.id + ".svg");
-        writeFileSync(out, toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: f.hasNerdFont }));
+        writeFileSync(out, toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: !!f.nerdFont && f.setFamily === f.nerdFont }));
         map[f.id] = out;
       }
       console.log(JSON.stringify(map));
@@ -295,7 +295,7 @@ function runFont(argv: string[]): void {
     const q = norm(argv[1] ?? "");
     const f = cat.find((x) => norm(x.id) === q || norm(x.name) === q);
     if (!f) { console.error(`theme font: unknown font '${argv[1]}'`); process.exit(1); }
-    const svg = toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: f.hasNerdFont });
+    const svg = toPreviewSvg(theme, { fontFamily: f.setFamily, nerdGlyphs: !!f.nerdFont && f.setFamily === f.nerdFont });
     if (argv.includes("--stdout")) { process.stdout.write(svg); return; }
     mkdirSync(dir, { recursive: true });
     const out = join(dir, f.id + ".svg");
