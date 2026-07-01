@@ -85,13 +85,46 @@ theme list                 # installed + bundled themes
 theme set <name>           # project a theme to every tool + live-reload
 theme current              # the active theme
 theme init                 # re-apply the active theme (run from your shell rc)
+theme sync                 # vendor every installed editor theme into the config home
+theme browse "<query>"     # search the VS Code Marketplace for themes
+theme add <publisher.ext>  # download + vendor a Marketplace theme extension
+theme preview [<name>]     # render a code-sample preview card (SVG) for a theme
 theme raycast              # open the active theme as a Raycast import (macOS)
 theme check                # self-check, no writes
 ```
 
-Themes resolve from `themes/*.json` (bundled) and your installed editor extensions
-(it discovers Cursor/VSCode themes on disk). Drop any VSCode theme JSON into
-`themes/` and it shows up in `theme list`.
+Themes resolve from bundled defaults, your **installed editor extensions** (it
+discovers Cursor/VSCode themes on disk — including each editor's *built-in* themes
+like Dark Modern / Monokai), and `~/.config/monotheme/themes/` (vendored + custom).
+`theme browse` / `theme add` pull any theme from the VS Code Marketplace on demand.
+
+All runtime state lives in `~/.config/monotheme/` (active theme, vendored themes,
+`fonts.json`) — decoupled from the clone.
+
+## Fonts
+
+An orthogonal **font axis**, opt-in via `~/.config/monotheme/fonts.json`. Set one
+font *everywhere*, or override per surface (editor / terminal / ui). `mono` is the
+inherited base.
+
+```sh
+theme font set "<font>" [size]         # set the font everywhere (the mono base)
+theme font set editor "<font>" [size]  # override one surface: editor|terminal|ui
+theme font show                        # current resolved fonts
+theme font catalog [--nerd]            # ~200 curated programming fonts (Nerd-Font-aware)
+theme font install <id>                # install a font (Homebrew cask, or nerd-fonts .tar.xz)
+```
+
+The catalog reuses the open-source **programmingfonts** + **nerd-fonts** databases,
+so `<font>` can be a catalog id (`jetbrains-mono`) or a family name. The Nerd Font
+variant is preferred automatically when installed — install it for terminal/editor
+so prompts and file-explorer glyphs render.
+
+Font targets: ghostty, kitty, alacritty (terminal); VSCode, Cursor, Zed, Sublime
+(editor/ui). TUIs inherit the terminal font. **ghostty** needs a one-time include —
+add `config-file = monotheme-fonts` to `~/.config/ghostty/config`, *after* any
+existing `font-family` line (ghostty's `font-family` is additive, so the include
+must come later to win).
 
 ## Cross-machine sync (optional)
 
