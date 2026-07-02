@@ -19,6 +19,12 @@ export interface Projection {
   success: string;
   error: string;
   warning: string;
+  /** git status label colors — distinct from success/error/warning (diagnostics/
+   *  gutter colors): VS Code's sidebar git labels read gitDecoration.*ResourceForeground
+   *  specifically, which themes often color differently from their gutter/error colors. */
+  gitAdded: string;
+  gitModified: string;
+  gitDeleted: string;
   /** ANSI 0..15 */
   ansi: string[];
   /** non-fatal notes (e.g. "terminal colors were inferred") */
@@ -127,6 +133,12 @@ export function project(theme: VscodeTheme): Projection {
     success: pick(c, ["editorGutter.addedBackground", "gitDecoration.addedResourceForeground"]) ?? ansi[2]!,
     error: pick(c, ["editorError.foreground", "errorForeground", "gitDecoration.deletedResourceForeground"]) ?? ansi[1]!,
     warning: pick(c, ["editorWarning.foreground", "list.warningForeground"]) ?? ansi[3]!,
+    // When a theme omits gitDecoration.*, fall back through the same chain
+    // success/warning/error use — not straight to raw ANSI — so an undefined
+    // slot resolves identically on both the vscode and zed sides.
+    gitAdded: pick(c, ["gitDecoration.addedResourceForeground", "editorGutter.addedBackground"]) ?? ansi[2]!,
+    gitModified: pick(c, ["gitDecoration.modifiedResourceForeground", "editorWarning.foreground", "list.warningForeground"]) ?? ansi[3]!,
+    gitDeleted: pick(c, ["gitDecoration.deletedResourceForeground", "editorError.foreground", "errorForeground"]) ?? ansi[1]!,
     ansi,
     warnings,
   };

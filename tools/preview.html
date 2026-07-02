@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>monotheme: vscode vs zed preview</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 20px; background: #111; color: #ddd;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
+  h1 { font-size: 15px; margin: 0 0 4px; }
+  .sub { font-size: 12px; color: #888; margin: 0 0 16px; }
+  select {
+    font: inherit; padding: 6px 10px; margin-bottom: 20px;
+    background: #1c1c1c; color: #ddd; border: 1px solid #333; border-radius: 6px;
+  }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pane { border: 1px solid #333; border-radius: 8px; overflow: hidden; }
+  .pane-label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    padding: 6px 10px; background: #1c1c1c; color: #888; border-bottom: 1px solid #333;
+  }
+  .tree { font-family: ui-monospace, monospace; font-size: 13px; padding: 8px 0; min-height: 260px; }
+  .row { padding: 3px 12px; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .row .name { flex: 1; }
+  .row .tag { font-size: 10px; opacity: .7; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; }
+  th, td { text-align: left; padding: 5px 10px; border-bottom: 1px solid #2a2a2a; }
+  th { color: #888; font-weight: 500; font-size: 11px; text-transform: uppercase; }
+  .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; border: 1px solid rgba(255,255,255,.15); }
+  .badge { padding: 2px 7px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .badge.fail { background: #4a1414; color: #ff8080; }
+  .badge.AA-large { background: #4a3d14; color: #ffd480; }
+  .badge.AA { background: #1c3d1c; color: #90ee90; }
+  .badge.AAA { background: #143d2a; color: #7fffd4; }
+  .reports { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 20px; }
+</style>
+</head>
+<body>
+  <h1>monotheme — vscode vs zed adapter preview</h1>
+  <p class="sub">Renders each target's actual adapter output (real code, not a reimplementation) side by side, with a WCAG contrast report per pane.</p>
+  <select id="theme"></select>
+
+  <div class="panes">
+    <div class="pane">
+      <div class="pane-label">VS Code / Cursor (raw theme.colors — no transform)</div>
+      <div class="tree" id="tree-vscode"></div>
+    </div>
+    <div class="pane">
+      <div class="pane-label">Zed (toZed() adapter output)</div>
+      <div class="tree" id="tree-zed"></div>
+    </div>
+  </div>
+
+  <div class="reports">
+    <div>
+      <table id="report-vscode"></table>
+    </div>
+    <div>
+      <table id="report-zed"></table>
+    </div>
+  </div>
+
+<script>
+const FILES = [
+  { kind: "folder", name: "src" },
+  { kind: "file", name: "index.ts" },
+  { kind: "file", name: "readme.md" },
+  { kind: "file", name: "app.tsx", state: "selected" },
+  { kind: "file", name: "utils.ts", state: "hover" },
+  { kind: "file", name: "config.json", git: "modified" },
+  { kind: "file", name: "new-feature.ts", git: "added" },
+  { kind: "file", name: "old.ts", git: "deleted" },
+];
+
+function renderTree(el, style, kind) {
+  el.innerHTML = "";
+  const panelBg = kind === "vscode" ? style["sidebar text"].bg : style["sidebar text"].bg;
+  el.style.background = panelBg;
+  el.style.color = style["sidebar text"].fg;
+
+  for (const f of FILES) {
+    const row = document.createElement("div");
+    row.className = "row";
+    let bg = "transparent", fg = style["sidebar text"].fg;
+
+    if (f.state === "selected") {
+      const c = style["selected row text"] || style["active selection text"];
+      bg = c.bg; fg = c.fg;
+    } else if (f.state === "hover") {
+      const c = style["row on hover"];
+      bg = c.bg; fg = c.fg;
+    } else if (kind === "vscode" && style["sidebar muted text (path/dim)"] === undefined) {
+      // no-op
+    }
+
+    row.style.background = bg;
+    row.style.color = fg;
+
+    if (f.git) {
+      const label = f.git === "modified" ? "git: modified label" : f.git === "added" ? "git: added label" : "git: deleted label";
+      const c = style[label];
+      row.innerHTML = `<span class="dot" style="background:${c.fg}"></span><span class="name">${f.name}</span><span class="tag" style="color:${c.fg}">${f.git}</span>`;
+    } else {
+      row.innerHTML = `<span class="name">${f.kind === "folder" ? "📁 " : "📄 "}${f.name}</span>`;
+    }
+    el.appendChild(row);
+  }
+}
+
+function renderReport(el, checks) {
+  el.innerHTML = `<tr><th>check</th><th>colors</th><th>ratio</th><th>level</th></tr>` +
+    checks.map(c => `
+      <tr>
+        <td>${c.label}</td>
+        <td><span class="swatch" style="background:${c.fg}"></span><span class="swatch" style="background:${c.bg}"></span></td>
+        <td>${c.ratio.toFixed(2)}:1</td>
+        <td><span class="badge ${c.level}">${c.level}</span></td>
+      </tr>`).join("");
+}
+
+async function loadTheme(name) {
+  const data = await fetch(`/api/theme?name=${encodeURIComponent(name)}`).then(r => r.json());
+  renderTree(document.getElementById("tree-vscode"), data.vscode.style, "vscode");
+  renderTree(document.getElementById("tree-zed"), data.zed.style, "zed");
+  renderReport(document.getElementById("report-vscode"), data.vscode.checks);
+  renderReport(document.getElementById("report-zed"), data.zed.checks);
+}
+
+async function init() {
+  const themes = await fetch("/api/themes").then(r => r.json());
+  const select = document.getElementById("theme");
+  select.innerHTML = themes.map(t => `<option value="${t}">${t}</option>`).join("");
+  select.addEventListener("change", () => loadTheme(select.value));
+  const preferred = themes.find(t => t.includes("shades-of-purple")) || themes[0];
+  select.value = preferred;
+  loadTheme(preferred);
+}
+init();
+</script>
+</body>
+</html>

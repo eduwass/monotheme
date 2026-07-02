@@ -92,7 +92,7 @@ export function toZed(theme: VscodeTheme): string {
           "terminal.ansi.bright_blue": a[12], "terminal.ansi.bright_magenta": a[13], "terminal.ansi.bright_cyan": a[14],
           "terminal.ansi.bright_white": a[15],
           error: p.error, warning: p.warning, success: p.success,
-          created: p.success, modified: p.warning, deleted: p.error,
+          created: p.gitAdded, modified: p.gitModified, deleted: p.gitDeleted,
           players: [{ cursor: p.cursor, background: p.cursor, selection: p.selection }],
           syntax: {
             comment: st(["comment"], a[8]!),

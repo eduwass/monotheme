@@ -26,6 +26,7 @@
   },
   "scripts": {
     "check": "bun run src/cli.ts check",
+    "preview:compare": "bun tools/preview-server.ts",
     "test": "bun test",
     "embed": "bun scripts/embed-themes.ts",
     "fonts:gen": "bun scripts/gen-font-catalog.ts",
