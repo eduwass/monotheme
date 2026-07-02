@@ -62,6 +62,11 @@ export function zedTintedButtonChecks(theme: VscodeTheme): ContrastCheck[] {
   return [
     { label: "branch pill text", fg: style.text, bg: style["info.background"] },
     { label: "branch pill border vs bg", fg: style["info.border"], bg: style["info.background"] },
+    // Branches/Stashes tab selector (toggle_button.rs) draws its label in
+    // Color::Accent (= text.accent) on this SAME background — a different fixed
+    // pairing than the branch pill above, and easy to silently break if only the
+    // pill's pairing is checked.
+    { label: "selected tab label (accent) vs bg", fg: style["text.accent"], bg: style["info.background"] },
   ];
 }
 

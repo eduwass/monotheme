@@ -96,27 +96,26 @@ export function toZed(theme: VscodeTheme): string {
           "terminal.ansi.bright_blue": a[12], "terminal.ansi.bright_magenta": a[13], "terminal.ansi.bright_cyan": a[14],
           "terminal.ansi.bright_white": a[15],
           error: p.error, warning: p.warning, success: p.success,
-          // Zed reads these for tinted-button chrome (e.g. the branch-picker pill,
-          // ButtonStyle::Tinted) — undefined here means Zed silently falls back to
-          // its OWN default blue, ignoring the theme entirely. Matched to VS Code's
-          // "Commit & Push" button: full-strength button.background where that's
-          // already readable, otherwise nudged toward the theme's own `bg` (not a
-          // generic black/white) until the label clears AA — bg/fg are guaranteed
-          // to already pair well, so this stays inside the theme's own palette
-          // (e.g. Shades of Purple's yellow drifts toward its dark purple, not
-          // toward flat black) instead of desaturating into a gray wash.
-          // NOTE: the label drawn on top is hardcoded by Zed itself to the theme's
-          // generic `text` (crates/ui/.../button_like.rs: `cx.theme().colors().text`)
-          // — there's no theme key for this button's foreground, so we can only
-          // move the background; white/matched label text isn't reachable at all.
-          "info.background": ensureContrast(p.accent, p.fg, p.bg),
-          "info.border": ensureContrast(p.accent, p.fg, p.bg),
-          "success.background": ensureContrast(p.gitAdded, p.fg, p.bg),
-          "success.border": ensureContrast(p.gitAdded, p.fg, p.bg),
-          "warning.background": ensureContrast(p.gitModified, p.fg, p.bg),
-          "warning.border": ensureContrast(p.gitModified, p.fg, p.bg),
-          "error.background": ensureContrast(p.gitDeleted, p.fg, p.bg),
-          "error.border": ensureContrast(p.gitDeleted, p.fg, p.bg),
+          // Zed reads these for tinted-button chrome — undefined here means Zed
+          // silently falls back to its OWN default blue, ignoring the theme
+          // entirely. Matched to VS Code's "Commit & Push" button: full-strength
+          // button.background, nudged toward the theme's own `bg` until readable.
+          // Two DIFFERENT Zed components draw a label on this background with two
+          // DIFFERENT fixed colors we don't control: the branch pill uses the
+          // generic `text` (button_like.rs), but the Branches/Stashes tab selector
+          // uses `Color::Accent` = our `text.accent` = raw p.accent (toggle_button.rs
+          // — Label::new(label).color(Color::Accent) when selected). Since the
+          // background STARTS as p.accent too, whenever no nudge was needed for the
+          // `text` pairing it stayed IDENTICAL to text.accent → invisible label on
+          // the tab selector. Must clear contrast against BOTH fixed labels.
+          "info.background": ensureContrast(ensureContrast(p.accent, p.fg, p.bg), p.accent, p.bg),
+          "info.border": ensureContrast(ensureContrast(p.accent, p.fg, p.bg), p.accent, p.bg),
+          "success.background": ensureContrast(ensureContrast(p.gitAdded, p.fg, p.bg), p.accent, p.bg),
+          "success.border": ensureContrast(ensureContrast(p.gitAdded, p.fg, p.bg), p.accent, p.bg),
+          "warning.background": ensureContrast(ensureContrast(p.gitModified, p.fg, p.bg), p.accent, p.bg),
+          "warning.border": ensureContrast(ensureContrast(p.gitModified, p.fg, p.bg), p.accent, p.bg),
+          "error.background": ensureContrast(ensureContrast(p.gitDeleted, p.fg, p.bg), p.accent, p.bg),
+          "error.border": ensureContrast(ensureContrast(p.gitDeleted, p.fg, p.bg), p.accent, p.bg),
           created: p.gitAdded, modified: p.gitModified, deleted: p.gitDeleted,
           players: [{ cursor: p.cursor, background: p.cursor, selection: p.selection }],
           syntax: {
