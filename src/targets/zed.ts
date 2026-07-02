@@ -21,14 +21,12 @@ export function toZed(theme: VscodeTheme): string {
   const a = p.ansi;
   // Subtle, theme-adaptive chrome so pane dividers/hovers don't glare (some themes
   // set their UI border to the accent colour, which Zed paints on every divider).
-  // Blended from bgPanel (what panels/pickers/popovers actually sit on), not bg —
-  // a border tuned against the editor background isn't guaranteed visible against
-  // a different panel background. 0.14 measured under WCAG non-text contrast
-  // (SC 1.4.11, 3:1 min for UI boundaries) as too faint in every bundled theme;
-  // 0.32 clears 3:1 across all of them.
-  const border = mix(p.bgPanel, p.fg, 0.32);
-  const hover = mix(p.bgPanel, p.fg, 0.07);
-  const thumb = mix(p.bgPanel, p.fg, 0.22);
+  // Deliberately dim/low-contrast by design — this is a decorative divider, not
+  // something that needs to pass WCAG non-text contrast; visually louder reads as
+  // busier UI chrome, not "more accessible."
+  const border = mix(p.bg, p.fg, 0.14);
+  const hover = mix(p.bg, p.fg, 0.07);
+  const thumb = mix(p.bg, p.fg, 0.22);
   // Resolve a Zed syntax token from the theme's tokenColors the way shiki/VSCode
   // do — most-specific scope wins, color + font style resolved independently —
   // so Zed's treesitter highlighting matches what VSCode would render.
@@ -102,8 +100,8 @@ export function toZed(theme: VscodeTheme): string {
           // its OWN default blue, ignoring the theme entirely. Text drawn on top
           // uses the theme's plain `text`, so the background needs to stay a light
           // wash (not full-strength status color) to keep that pairing readable.
-          "info.background": mix(p.bgPanel, a[4]!, 0.18),
-          "info.border": mix(p.bgPanel, a[4]!, 0.85),
+          "info.background": mix(p.bgPanel, a[4]!, 0.30),
+          "info.border": mix(p.bgPanel, a[4]!, 0.30),
           "success.background": mix(p.bgPanel, p.gitAdded, 0.18),
           "success.border": mix(p.bgPanel, p.gitAdded, 0.85),
           "warning.background": mix(p.bgPanel, p.gitModified, 0.18),
