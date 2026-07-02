@@ -6,8 +6,11 @@
 //   theme init                 re-apply the active theme (run from shell rc)
 //   theme raycast              open the active theme as a Raycast import (one click)
 //   theme check                self-check (no writes)
+//   theme pair set <light> <dark>   remember which theme goes with which appearance
+//   theme auto                 apply the pair-matching theme for the current system appearance
+//   theme watch install         switch automatically as macOS appearance changes (launchd)
 import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { execSync } from "node:child_process";
 import { loadTheme, stripAlpha } from "./load.ts";
 import { project } from "./project.ts";
@@ -18,7 +21,7 @@ import { makeCtx, applyTarget } from "./target-kit.ts";
 import { toTmTheme } from "./formats/tmtheme.ts";
 import { toGhostty } from "./targets/ghostty.ts";
 import { raycastImportUrl } from "./formats/raycast.ts";
-import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, migrateConfigHome, hydrateDefaults } from "./paths.ts";
+import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, PAIR, WATCH_SCRIPT, WATCH_LOG, WATCH_PLIST, WATCH_LABEL, migrateConfigHome, hydrateDefaults } from "./paths.ts";
 import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
 import { catalogWithStatus, findFont, installFont, resolveFamily } from "./fonts-catalog.ts";
 import { toPreviewSvg } from "./preview.ts";
@@ -163,6 +166,83 @@ switch (cmd) {
     if (!existsSync(STATE)) { console.log("(none)"); break; }
     console.log(readFileSync(STATE, "utf8").trim());
     break;
+  }
+  case "pair": {
+    // `theme pair set <light> <dark>` remembers which theme to use for each
+    // system appearance; `theme auto` (and the watcher) consult this.
+    const sub = rest[0];
+    if (sub === "set") {
+      const light = rest[1], dark = rest[2];
+      if (!light || !dark) { console.error("usage: theme pair set <light-theme> <dark-theme>"); process.exit(1); }
+      if (!resolveTheme(light)) { console.error(`theme: unknown theme '${light}' (try: theme list)`); process.exit(1); }
+      if (!resolveTheme(dark)) { console.error(`theme: unknown theme '${dark}' (try: theme list)`); process.exit(1); }
+      mkdirSync(CONFIG_HOME, { recursive: true });
+      writeFileSync(PAIR, JSON.stringify({ light, dark }, null, 2) + "\n");
+      console.log(`pair: light=${light} dark=${dark}\n\nnow run:  theme watch install   (to switch automatically)`);
+      break;
+    }
+    if (!existsSync(PAIR)) { console.log("(no pair set — theme pair set <light-theme> <dark-theme>)"); break; }
+    const { light, dark } = JSON.parse(readFileSync(PAIR, "utf8"));
+    console.log(`light: ${light}\ndark:  ${dark}`);
+    break;
+  }
+  case "auto": {
+    // Apply whichever half of the pair matches the CURRENT system appearance.
+    // Called by the watcher on every appearance flip, and safe to call by hand.
+    if (process.platform !== "darwin") { console.log("theme auto: only macOS appearance is detected today"); break; }
+    if (!existsSync(PAIR)) { console.error("theme auto: no pair set — theme pair set <light-theme> <dark-theme>"); process.exit(1); }
+    const { light, dark } = JSON.parse(readFileSync(PAIR, "utf8"));
+    const isDark = (() => {
+      try { return execSync("defaults read -g AppleInterfaceStyle 2>/dev/null", { encoding: "utf8" }).trim() === "Dark"; }
+      catch { return false; } // key absent → Light
+    })();
+    const target = isDark ? dark : light;
+    const cur = existsSync(STATE) ? readFileSync(STATE, "utf8").trim() : "";
+    const targetSlug = resolveTheme(target)?.slug ?? slugify(target);
+    if (targetSlug === cur) { break; } // already matches, no-op
+    const { canonical } = applyTheme(target, rest.includes("--quiet"));
+    if (!rest.includes("--no-propagate")) propagate(canonical);
+    break;
+  }
+  case "watch": {
+    // A launchd agent that polls macOS's appearance (2s) and runs `theme auto` the
+    // instant it changes — the closest thing to a live watcher without an ObjC/JXA
+    // notification bridge, and far simpler to keep working across macOS versions.
+    if (process.platform !== "darwin") { console.log("theme watch: only supported on macOS"); break; }
+    const sub = rest[0];
+    if (sub === "install") {
+      if (!existsSync(PAIR)) { console.error("theme watch: set a pair first — theme pair set <light-theme> <dark-theme>"); process.exit(1); }
+      // Reconstruct how to re-invoke ourselves: a source checkout runs via
+      // `bun run cli.ts`, a compiled binary runs standalone.
+      const self = process.argv[1]?.endsWith(".ts")
+        ? `${process.execPath} run ${resolve(process.argv[1])}`
+        : resolve(process.argv[1] ?? process.argv0);
+      mkdirSync(CONFIG_HOME, { recursive: true });
+      writeFileSync(WATCH_SCRIPT, `#!/bin/bash\nprev=""\nwhile true; do\n  cur=$(defaults read -g AppleInterfaceStyle 2>/dev/null)\n  if [ "$cur" != "$prev" ]; then\n    prev="$cur"\n    ${self} auto >/dev/null 2>&1\n  fi\n  sleep 2\ndone\n`);
+      execSync(`chmod +x '${WATCH_SCRIPT}'`);
+      const plist = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>Label</key><string>${WATCH_LABEL}</string>\n  <key>ProgramArguments</key><array><string>/bin/bash</string><string>${WATCH_SCRIPT}</string></array>\n  <key>RunAtLoad</key><true/>\n  <key>KeepAlive</key><true/>\n  <key>StandardOutPath</key><string>${WATCH_LOG}</string>\n  <key>StandardErrorPath</key><string>${WATCH_LOG}</string>\n</dict>\n</plist>\n`;
+      mkdirSync(join(WATCH_PLIST, ".."), { recursive: true });
+      writeFileSync(WATCH_PLIST, plist);
+      try { execSync(`launchctl unload '${WATCH_PLIST}' 2>/dev/null`); } catch {}
+      execSync(`launchctl load -w '${WATCH_PLIST}'`);
+      console.log(`watch: installed — theme will switch automatically with the system appearance\n  log: ${WATCH_LOG.replace(process.env.HOME || "~", "~")}`);
+      break;
+    }
+    if (sub === "uninstall") {
+      try { execSync(`launchctl unload '${WATCH_PLIST}' 2>/dev/null`); } catch {}
+      if (existsSync(WATCH_PLIST)) rmSync(WATCH_PLIST);
+      if (existsSync(WATCH_SCRIPT)) rmSync(WATCH_SCRIPT);
+      console.log("watch: uninstalled");
+      break;
+    }
+    if (sub === "status" || !sub) {
+      let running = false;
+      try { running = execSync(`launchctl list 2>/dev/null | grep -q '${WATCH_LABEL}' && echo yes || echo no`, { encoding: "utf8" }).trim() === "yes"; } catch {}
+      console.log(running ? "watch: running" : "watch: not installed (theme watch install)");
+      break;
+    }
+    console.error("usage: theme watch <install|uninstall|status>");
+    process.exit(1);
   }
   case "init": {
     // prefer the canonical .active.json (works even for themes not installed
@@ -352,7 +432,7 @@ switch (cmd) {
     break;
   }
   default:
-    console.log("usage: theme <list|set|current|init|sync|browse|add|remove|font|raycast|check> [name]");
+    console.log("usage: theme <list|set|current|init|sync|browse|add|remove|font|raycast|check|pair|auto|watch> [name]");
     process.exit(cmd ? 1 : 0);
 }
 

@@ -23,6 +23,11 @@ export const STATE = join(CONFIG_HOME, "state");
 export const ACTIVE = join(CONFIG_HOME, "active.json");
 export const FONTS = join(CONFIG_HOME, "fonts.json");
 export const USER_THEMES = join(CONFIG_HOME, "themes");
+export const PAIR = join(CONFIG_HOME, "pair.json");
+export const WATCH_SCRIPT = join(CONFIG_HOME, "watch-appearance.sh");
+export const WATCH_LOG = join(CONFIG_HOME, "watch.log");
+export const WATCH_PLIST = join(HOME, "Library", "LaunchAgents", "com.eduwass.monotheme.watch.plist");
+export const WATCH_LABEL = "com.eduwass.monotheme.watch";
 
 // The curated default library shipped with the source (later embedded in the
 // binary). Read-only source, not a runtime write path.
