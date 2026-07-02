@@ -221,7 +221,11 @@ switch (cmd) {
       // launchd agents don't source shell rc files, so THEME_PEER/THEME_PEER_CMD
       // (set in .zshrc for cross-machine sync) are invisible to `theme auto` unless
       // we capture them now (from this installing shell) and bake them into the script.
+      // Same problem for PATH: launchd's default is just /usr/bin:/bin:/usr/sbin:/sbin,
+      // so target detection (c.hasCmd("fzf") etc.) silently fails and per-tool configs
+      // like fzf's theme.sh never get regenerated on an auto-switch.
       const envLines = [
+        `export PATH='${process.env.PATH ?? ""}'`,
         process.env.THEME_PEER ? `export THEME_PEER='${process.env.THEME_PEER}'` : null,
         process.env.THEME_PEER_CMD ? `export THEME_PEER_CMD='${process.env.THEME_PEER_CMD}'` : null,
       ].filter(Boolean).join("\n");
