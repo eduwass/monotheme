@@ -7,7 +7,10 @@ import { toBase16 } from "../base16.ts";
 export function toFzf(theme: VscodeTheme): string {
   const b = toBase16(theme);
   const color = [
-    `bg:${b.base00}`, `bg+:${b.base01}`, `fg:${b.base05}`, `fg+:${b.base06}`,
+    // bg/bg+/gutter transparent (-1 = terminal default) — fzf then always matches
+    // whatever the terminal is actually showing, so a theme switch in an already-
+    // open shell never leaves stale fzf colors behind, even before a reload.
+    `bg:-1`, `bg+:-1`, `fg:${b.base05}`, `fg+:${b.base06}`,
     `hl:${b.base0D}`, `hl+:${b.base0D}`, `header:${b.base0E}`, `info:${b.base0A}`,
     `marker:${b.base0B}`, `pointer:${b.base08}`, `prompt:${b.base0E}`,
     `spinner:${b.base0C}`, `border:${b.base02}`, `gutter:-1`,
