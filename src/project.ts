@@ -15,6 +15,11 @@ export interface Projection {
   border: string;
   borderActive: string;
   selection: string;
+  /** list/tree row selection background — distinct from `selection` (editor text
+   *  selection wash, often translucent). VS Code authors list.activeSelectionBackground
+   *  specifically to pair readably with row text; reusing editor selection for this
+   *  produces low-contrast rows in themes where the two aren't the same. */
+  listSelected: string;
   cursor: string;
   success: string;
   error: string;
@@ -129,6 +134,7 @@ export function project(theme: VscodeTheme): Projection {
     border,
     borderActive: pick(c, ["tab.activeBorder", "focusBorder"]) ?? accent,
     selection: pick(c, ["editor.selectionBackground", "terminal.selectionBackground"]) ?? ansi[8]!,
+    listSelected: pick(c, ["list.activeSelectionBackground", "editor.selectionBackground"]) ?? ansi[8]!,
     cursor: pick(c, ["editorCursor.foreground", "terminalCursor.foreground", "editor.foreground"]) ?? fg,
     success: pick(c, ["editorGutter.addedBackground", "gitDecoration.addedResourceForeground"]) ?? ansi[2]!,
     error: pick(c, ["editorError.foreground", "errorForeground", "gitDecoration.deletedResourceForeground"]) ?? ansi[1]!,
