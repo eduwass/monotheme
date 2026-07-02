@@ -87,6 +87,26 @@
     </div>
   </div>
 
+  <h1 style="margin-top:28px">branch pill (title bar)</h1>
+  <p class="sub">Zed's ButtonStyle::Tinted branch trigger (crates/title_bar/src/title_bar.rs) — reads status.info.background/border, a key family we didn't set until this fix (Zed silently fell back to its own default blue). VS Code has no direct equivalent; shown as a generic tinted badge for comparison.</p>
+
+  <div class="panes">
+    <div class="pane" style="padding:16px">
+      <div class="pane-label" style="margin:-16px -16px 12px -16px">VS Code / Cursor (no dedicated equivalent — n/a)</div>
+    </div>
+    <div class="pane" style="padding:16px">
+      <div class="pane-label" style="margin:-16px -16px 12px -16px">Zed (info.background / info.border from toZed())</div>
+      <div id="pill-zed"></div>
+    </div>
+  </div>
+
+  <div class="reports">
+    <div></div>
+    <div>
+      <table id="pill-report-zed"></table>
+    </div>
+  </div>
+
 <script>
 const FILES = [
   { kind: "folder", name: "src" },
@@ -191,6 +211,21 @@ function renderPicker(el, checks) {
   }
 }
 
+function renderPill(el, checks) {
+  const byLabel = Object.fromEntries(checks.map(c => [c.label, c]));
+  const text = byLabel["branch pill text"];
+  const border = byLabel["branch pill border vs bg"];
+  el.innerHTML = `
+    <span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;
+      border-radius:5px;font-family:ui-monospace,monospace;font-size:13px;
+      background:${text.bg};color:${text.fg};border:1.5px solid ${border.fg};">
+      main
+    </span>
+    <span style="color:#666;margin-left:8px;font-size:11px;">
+      text ${text.ratio.toFixed(2)}:1 (${text.level}) · border ${border.ratio.toFixed(2)}:1 (${border.level})
+    </span>`;
+}
+
 async function loadTheme(name) {
   const data = await fetch(`/api/theme?name=${encodeURIComponent(name)}`).then(r => r.json());
   renderTree(document.getElementById("tree-vscode"), data.vscode.style, "vscode");
@@ -201,6 +236,8 @@ async function loadTheme(name) {
   renderPicker(document.getElementById("picker-zed"), data.zed.pickerChecks);
   renderReport(document.getElementById("picker-report-vscode"), data.vscode.pickerChecks);
   renderReport(document.getElementById("picker-report-zed"), data.zed.pickerChecks);
+  renderPill(document.getElementById("pill-zed"), data.zed.tintedButtonChecks);
+  renderReport(document.getElementById("pill-report-zed"), data.zed.tintedButtonChecks);
 }
 
 async function init() {
