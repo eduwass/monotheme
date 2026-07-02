@@ -1,6 +1,6 @@
 // WCAG 2.x contrast ratio — same math browsers/axe use. Pure, no deps, so it
 // can run identically in the CLI (Bun) and if ever needed client-side.
-import { stripAlpha } from "./load.ts";
+import { stripAlpha, mix } from "./load.ts";
 
 function srgbToLinear(c: number): number {
   const s = c / 255;
@@ -39,6 +39,26 @@ export interface ContrastCheck {
 export interface ContrastResult extends ContrastCheck {
   ratio: number;
   level: WcagLevel;
+}
+
+/**
+ * Nudge `color` toward `toward` — NOT toward generic black/white — until it
+ * reaches `min` contrast against `against`, using the smallest step that clears
+ * it. Pass the theme's own `bg` as `toward` and its `fg` as `against`: bg/fg are
+ * guaranteed to already contrast well (that's the base editor pairing every
+ * usable theme has), so blending an accent color toward bg is guaranteed to
+ * converge on something readable — and stays inside the theme's own palette
+ * (e.g. Shades of Purple's yellow drifts toward its dark purple, not toward flat
+ * black), instead of desaturating into an unrelated gray wash. Returns `color`
+ * unchanged if it already clears the threshold.
+ */
+export function ensureContrast(color: string, against: string, toward: string, min = 4.5): string {
+  if (contrastRatio(against, color) >= min) return color;
+  for (let t = 0.05; t <= 1; t += 0.05) {
+    const candidate = mix(color, toward, t);
+    if (contrastRatio(against, candidate) >= min) return candidate;
+  }
+  return toward; // toward vs against is guaranteed to clear min — this is the t=1 endpoint
 }
 
 export function runChecks(checks: ContrastCheck[]): ContrastResult[] {

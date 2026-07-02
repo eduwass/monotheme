@@ -3,6 +3,7 @@ import { defineTarget } from "../target-kit.ts";
 // ~/.config/zed/themes/ and hot-reloads. We pin a stable theme name "Monotheme".
 import type { VscodeTheme } from "../load.ts";
 import { project, scopeColor, resolveToken } from "../project.ts";
+import { ensureContrast } from "../contrast.ts";
 
 export const ZED_THEME_NAME = "Monotheme";
 
@@ -97,21 +98,25 @@ export function toZed(theme: VscodeTheme): string {
           error: p.error, warning: p.warning, success: p.success,
           // Zed reads these for tinted-button chrome (e.g. the branch-picker pill,
           // ButtonStyle::Tinted) — undefined here means Zed silently falls back to
-          // its OWN default blue, ignoring the theme entirely. Matched 1:1 to VS
-          // Code's actual "Commit & Push" button: full-strength button.background
-          // (= p.accent), no wash, no border — same as VS Code's borderless button.
+          // its OWN default blue, ignoring the theme entirely. Matched to VS Code's
+          // "Commit & Push" button: full-strength button.background where that's
+          // already readable, otherwise nudged toward the theme's own `bg` (not a
+          // generic black/white) until the label clears AA — bg/fg are guaranteed
+          // to already pair well, so this stays inside the theme's own palette
+          // (e.g. Shades of Purple's yellow drifts toward its dark purple, not
+          // toward flat black) instead of desaturating into a gray wash.
           // NOTE: the label drawn on top is hardcoded by Zed itself to the theme's
           // generic `text` (crates/ui/.../button_like.rs: `cx.theme().colors().text`)
-          // — there's no theme key for this button's foreground, so white label text
-          // (like VS Code's button.foreground) isn't reachable from theme JSON at all.
-          "info.background": p.accent,
-          "info.border": p.accent,
-          "success.background": p.gitAdded,
-          "success.border": p.gitAdded,
-          "warning.background": p.gitModified,
-          "warning.border": p.gitModified,
-          "error.background": p.gitDeleted,
-          "error.border": p.gitDeleted,
+          // — there's no theme key for this button's foreground, so we can only
+          // move the background; white/matched label text isn't reachable at all.
+          "info.background": ensureContrast(p.accent, p.fg, p.bg),
+          "info.border": ensureContrast(p.accent, p.fg, p.bg),
+          "success.background": ensureContrast(p.gitAdded, p.fg, p.bg),
+          "success.border": ensureContrast(p.gitAdded, p.fg, p.bg),
+          "warning.background": ensureContrast(p.gitModified, p.fg, p.bg),
+          "warning.border": ensureContrast(p.gitModified, p.fg, p.bg),
+          "error.background": ensureContrast(p.gitDeleted, p.fg, p.bg),
+          "error.border": ensureContrast(p.gitDeleted, p.fg, p.bg),
           created: p.gitAdded, modified: p.gitModified, deleted: p.gitDeleted,
           players: [{ cursor: p.cursor, background: p.cursor, selection: p.selection }],
           syntax: {
