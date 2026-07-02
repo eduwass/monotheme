@@ -53,3 +53,58 @@ export function zedFileTreeChecks(theme: VscodeTheme): ContrastCheck[] {
     { label: "git: deleted label", fg: deleted, bg: panelBg },
   ];
 }
+
+// The branch-picker pill (title_bar.rs render_worktree_and_branch, ButtonStyle::
+// Tinted(TintColor::Accent)) — draws `text` on `info.background`, bordered by
+// `info.border`. Distinct from the file-tree/picker checks above.
+export function zedTintedButtonChecks(theme: VscodeTheme): ContrastCheck[] {
+  const style = JSON.parse(toZed(theme)).themes[0].style as Record<string, any>;
+  return [
+    { label: "branch pill text", fg: style.text, bg: style["info.background"] },
+    { label: "branch pill border vs bg", fg: style["info.border"], bg: style["info.background"] },
+  ];
+}
+
+// Zed's picker/overlay surface (command palette, worktree picker, quick-open) —
+// crates/git_ui/src/worktree_picker.rs styles rows with generic Color::Accent /
+// Color::Muted on elevated_surface.background, matching the theme keys below.
+export function zedPickerChecks(theme: VscodeTheme): ContrastCheck[] {
+  const style = JSON.parse(toZed(theme)).themes[0].style as Record<string, any>;
+  const bg: string = style["elevated_surface.background"];
+  const fg: string = style.text;
+  const fgMuted: string = style["text.muted"];
+  const accent: string = style["text.accent"];
+  const selectedBg: string = style["element.selected"];
+  const hoverBg: string = style["element.hover"];
+  const border: string = style.border;
+  return [
+    { label: "picker text", fg, bg },
+    { label: "picker muted text", fg: fgMuted, bg },
+    { label: "picker accent (current item icon)", fg: accent, bg },
+    { label: "picker selected row text", fg, bg: selectedBg },
+    { label: "picker row on hover", fg, bg: hoverBg },
+    { label: "picker border vs surface", fg: border, bg },
+  ];
+}
+
+// VS Code's closest equivalent: the Quick Open / Command Palette overlay.
+export function vscodePickerChecks(theme: VscodeTheme): ContrastCheck[] {
+  const c = theme.colors;
+  const p = project(theme);
+  const bg = pick(c, ["quickInput.background", "editorWidget.background"]) ?? p.bgPanel;
+  const fg = pick(c, ["quickInput.foreground", "editorWidget.foreground"]) ?? p.fg;
+  const fgMuted = pick(c, ["descriptionForeground"]) ?? p.fgMuted;
+  const accent = pick(c, ["pickerGroup.foreground", "textLink.foreground"]) ?? p.accent;
+  const selectedBg = pick(c, ["quickInputList.focusBackground", "list.activeSelectionBackground"]) ?? p.selection;
+  const selectedFg = pick(c, ["quickInputList.focusForeground", "list.activeSelectionForeground"]) ?? fg;
+  const hoverBg = pick(c, ["list.hoverBackground"]) ?? p.selection;
+  const border = pick(c, ["widget.border", "editorWidget.border"]) ?? p.border;
+  return [
+    { label: "picker text", fg, bg },
+    { label: "picker muted text", fg: fgMuted, bg },
+    { label: "picker accent (current item icon)", fg: accent, bg },
+    { label: "picker selected row text", fg: selectedFg, bg: selectedBg },
+    { label: "picker row on hover", fg, bg: hoverBg },
+    { label: "picker border vs surface", fg: border, bg },
+  ];
+}

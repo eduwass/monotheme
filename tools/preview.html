@@ -64,6 +64,29 @@
     </div>
   </div>
 
+  <h1 style="margin-top:28px">picker / overlay surface (command palette, worktree picker, quick-open)</h1>
+  <p class="sub">VS Code's Quick Input overlay vs Zed's elevated_surface (crates/git_ui/src/worktree_picker.rs) — a distinct UI role from the sidebar above.</p>
+
+  <div class="panes">
+    <div class="pane">
+      <div class="pane-label">VS Code / Cursor (quickInput.* — no transform)</div>
+      <div class="tree" id="picker-vscode"></div>
+    </div>
+    <div class="pane">
+      <div class="pane-label">Zed (elevated_surface.* from toZed())</div>
+      <div class="tree" id="picker-zed"></div>
+    </div>
+  </div>
+
+  <div class="reports">
+    <div>
+      <table id="picker-report-vscode"></table>
+    </div>
+    <div>
+      <table id="picker-report-zed"></table>
+    </div>
+  </div>
+
 <script>
 const FILES = [
   { kind: "folder", name: "src" },
@@ -122,12 +145,62 @@ function renderReport(el, checks) {
       </tr>`).join("");
 }
 
+const PICKER_ITEMS = [
+  { name: "main", current: true },
+  { name: "feat/dark-mode-toggle" },
+  { name: "fix/contrast-bug", state: "hover" },
+  { name: "chore/deps-bump", state: "selected" },
+];
+
+function renderPicker(el, checks) {
+  const byLabel = Object.fromEntries(checks.map(c => [c.label, c]));
+  const surface = byLabel["picker text"];
+  const border = byLabel["picker border vs surface"];
+  const muted = byLabel["picker muted text"];
+  const accent = byLabel["picker accent (current item icon)"];
+  const selected = byLabel["picker selected row text"];
+  const hover = byLabel["picker row on hover"];
+
+  el.innerHTML = "";
+  el.style.background = surface.bg;
+  el.style.color = surface.fg;
+  el.style.border = `2px solid ${border.fg}`;
+  el.style.borderRadius = "6px";
+  el.style.margin = "8px";
+
+  const header = document.createElement("div");
+  header.className = "row";
+  header.style.color = muted.fg;
+  header.style.borderBottom = `1px solid ${border.fg}`;
+  header.style.paddingBottom = "6px";
+  header.style.marginBottom = "4px";
+  header.textContent = "Select or type to create a worktree…";
+  el.appendChild(header);
+
+  for (const item of PICKER_ITEMS) {
+    const row = document.createElement("div");
+    row.className = "row";
+    let bg = "transparent", fg = surface.fg;
+    if (item.state === "selected") { bg = selected.bg; fg = selected.fg; }
+    else if (item.state === "hover") { bg = hover.bg; fg = hover.fg; }
+    row.style.background = bg;
+    row.style.color = fg;
+    const iconColor = item.current ? accent.fg : muted.fg;
+    row.innerHTML = `<span class="dot" style="background:${iconColor}"></span><span class="name">${item.name}</span>${item.current ? `<span class="tag" style="color:${accent.fg}">current</span>` : ""}`;
+    el.appendChild(row);
+  }
+}
+
 async function loadTheme(name) {
   const data = await fetch(`/api/theme?name=${encodeURIComponent(name)}`).then(r => r.json());
   renderTree(document.getElementById("tree-vscode"), data.vscode.style, "vscode");
   renderTree(document.getElementById("tree-zed"), data.zed.style, "zed");
   renderReport(document.getElementById("report-vscode"), data.vscode.checks);
   renderReport(document.getElementById("report-zed"), data.zed.checks);
+  renderPicker(document.getElementById("picker-vscode"), data.vscode.pickerChecks);
+  renderPicker(document.getElementById("picker-zed"), data.zed.pickerChecks);
+  renderReport(document.getElementById("picker-report-vscode"), data.vscode.pickerChecks);
+  renderReport(document.getElementById("picker-report-zed"), data.zed.pickerChecks);
 }
 
 async function init() {

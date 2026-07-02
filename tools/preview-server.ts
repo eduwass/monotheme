@@ -6,7 +6,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadTheme } from "../src/load.ts";
 import { runChecks } from "../src/contrast.ts";
-import { vscodeFileTreeChecks, zedFileTreeChecks } from "./checks.ts";
+import { vscodeFileTreeChecks, zedFileTreeChecks, vscodePickerChecks, zedPickerChecks, zedTintedButtonChecks } from "./checks.ts";
 import { REPO_THEMES } from "../src/paths.ts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -25,7 +25,13 @@ function themeData(slug: string) {
   const zedChecks = runChecks(zedFileTreeChecks(theme));
   const vscodeStyle = vscodeFileTreeChecks(theme).reduce((acc, c) => ({ ...acc, [c.label]: { fg: c.fg, bg: c.bg } }), {});
   const zedStyle = zedFileTreeChecks(theme).reduce((acc, c) => ({ ...acc, [c.label]: { fg: c.fg, bg: c.bg } }), {});
-  return { name: theme.name, type: theme.type, vscode: { style: vscodeStyle, checks: vscodeChecks }, zed: { style: zedStyle, checks: zedChecks } };
+  const vscodePicker = runChecks(vscodePickerChecks(theme));
+  const zedPicker = runChecks(zedPickerChecks(theme));
+  return {
+    name: theme.name, type: theme.type,
+    vscode: { style: vscodeStyle, checks: vscodeChecks, pickerChecks: vscodePicker },
+    zed: { style: zedStyle, checks: zedChecks, pickerChecks: zedPicker, tintedButtonChecks: runChecks(zedTintedButtonChecks(theme)) },
+  };
 }
 
 Bun.serve({
