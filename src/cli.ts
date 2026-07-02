@@ -218,7 +218,14 @@ switch (cmd) {
         ? `${process.execPath} run ${resolve(process.argv[1])}`
         : resolve(process.argv[1] ?? process.argv0);
       mkdirSync(CONFIG_HOME, { recursive: true });
-      writeFileSync(WATCH_SCRIPT, `#!/bin/bash\nprev=""\nwhile true; do\n  cur=$(defaults read -g AppleInterfaceStyle 2>/dev/null)\n  if [ "$cur" != "$prev" ]; then\n    prev="$cur"\n    ${self} auto >/dev/null 2>&1\n  fi\n  sleep 2\ndone\n`);
+      // launchd agents don't source shell rc files, so THEME_PEER/THEME_PEER_CMD
+      // (set in .zshrc for cross-machine sync) are invisible to `theme auto` unless
+      // we capture them now (from this installing shell) and bake them into the script.
+      const envLines = [
+        process.env.THEME_PEER ? `export THEME_PEER='${process.env.THEME_PEER}'` : null,
+        process.env.THEME_PEER_CMD ? `export THEME_PEER_CMD='${process.env.THEME_PEER_CMD}'` : null,
+      ].filter(Boolean).join("\n");
+      writeFileSync(WATCH_SCRIPT, `#!/bin/bash\n${envLines}\nprev=""\nwhile true; do\n  cur=$(defaults read -g AppleInterfaceStyle 2>/dev/null)\n  if [ "$cur" != "$prev" ]; then\n    prev="$cur"\n    ${self} auto >/dev/null 2>&1\n  fi\n  sleep 2\ndone\n`);
       execSync(`chmod +x '${WATCH_SCRIPT}'`);
       const plist = `<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n<plist version="1.0">\n<dict>\n  <key>Label</key><string>${WATCH_LABEL}</string>\n  <key>ProgramArguments</key><array><string>/bin/bash</string><string>${WATCH_SCRIPT}</string></array>\n  <key>RunAtLoad</key><true/>\n  <key>KeepAlive</key><true/>\n  <key>StandardOutPath</key><string>${WATCH_LOG}</string>\n  <key>StandardErrorPath</key><string>${WATCH_LOG}</string>\n</dict>\n</plist>\n`;
       mkdirSync(join(WATCH_PLIST, ".."), { recursive: true });
