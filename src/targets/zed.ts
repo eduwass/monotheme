@@ -97,17 +97,21 @@ export function toZed(theme: VscodeTheme): string {
           error: p.error, warning: p.warning, success: p.success,
           // Zed reads these for tinted-button chrome (e.g. the branch-picker pill,
           // ButtonStyle::Tinted) — undefined here means Zed silently falls back to
-          // its OWN default blue, ignoring the theme entirely. Text drawn on top
-          // uses the theme's plain `text`, so the background needs to stay a light
-          // wash (not full-strength status color) to keep that pairing readable.
-          "info.background": mix(p.bgPanel, a[4]!, 0.30),
-          "info.border": mix(p.bgPanel, a[4]!, 0.30),
-          "success.background": mix(p.bgPanel, p.gitAdded, 0.18),
-          "success.border": mix(p.bgPanel, p.gitAdded, 0.85),
-          "warning.background": mix(p.bgPanel, p.gitModified, 0.18),
-          "warning.border": mix(p.bgPanel, p.gitModified, 0.85),
-          "error.background": mix(p.bgPanel, p.gitDeleted, 0.18),
-          "error.border": mix(p.bgPanel, p.gitDeleted, 0.85),
+          // its OWN default blue, ignoring the theme entirely. Matched 1:1 to VS
+          // Code's actual "Commit & Push" button: full-strength button.background
+          // (= p.accent), no wash, no border — same as VS Code's borderless button.
+          // NOTE: the label drawn on top is hardcoded by Zed itself to the theme's
+          // generic `text` (crates/ui/.../button_like.rs: `cx.theme().colors().text`)
+          // — there's no theme key for this button's foreground, so white label text
+          // (like VS Code's button.foreground) isn't reachable from theme JSON at all.
+          "info.background": p.accent,
+          "info.border": p.accent,
+          "success.background": p.gitAdded,
+          "success.border": p.gitAdded,
+          "warning.background": p.gitModified,
+          "warning.border": p.gitModified,
+          "error.background": p.gitDeleted,
+          "error.border": p.gitDeleted,
           created: p.gitAdded, modified: p.gitModified, deleted: p.gitDeleted,
           players: [{ cursor: p.cursor, background: p.cursor, selection: p.selection }],
           syntax: {
