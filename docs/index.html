@@ -158,19 +158,19 @@
     theme what you have. Adding another is a small adapter away.</p>
   <div class="toolgrid">
     <div class="card"><h3><i style="background:var(--cyan)"></i>Terminals</h3>
-      <div class="chips"><span class="chip">ghostty</span><span class="chip">any 16-ANSI terminal</span></div></div>
+      <div class="chips"><span class="chip">ghostty</span><span class="chip">kitty</span><span class="chip">alacritty</span><span class="chip">WezTerm</span><span class="chip">Warp</span><span class="chip">any 16-ANSI terminal</span></div></div>
     <div class="card"><h3><i style="background:var(--green)"></i>TUI / shell</h3>
-      <div class="chips"><span class="chip">tmux</span><span class="chip">btop</span><span class="chip">fzf</span><span class="chip">lazygit</span><span class="chip">yazi</span><span class="chip">herdr</span></div></div>
+      <div class="chips"><span class="chip">tmux</span><span class="chip">btop</span><span class="chip">fzf</span><span class="chip">lazygit</span><span class="chip">yazi</span></div></div>
     <div class="card"><h3><i style="background:var(--purple)"></i>Editors</h3>
-      <div class="chips"><span class="chip">VSCode</span><span class="chip">Cursor</span><span class="chip">Zed</span><span class="chip">Neovim</span></div>
+      <div class="chips"><span class="chip">VSCode</span><span class="chip">Cursor</span><span class="chip">Zed</span><span class="chip">Neovim</span><span class="chip">Sublime Text</span></div>
       <p style="margin:12px 0 0;font-size:13px">chrome + TextMate syntax parity</p></div>
     <div class="card"><h3><i style="background:var(--pink)"></i>Agents / dev</h3>
-      <div class="chips"><span class="chip">opencode</span><span class="chip">Claude Code</span><span class="chip">hunk</span></div></div>
+      <div class="chips"><span class="chip">opencode</span><span class="chip">Claude Code</span><span class="chip">hunk</span><span class="chip">herdr</span></div></div>
     <div class="card"><h3><i style="background:var(--orange)"></i>Syntax export</h3>
       <div class="chips"><span class="chip">.tmTheme</span><span class="chip">shiki JSON</span><span class="chip">base16</span></div>
       <p style="margin:12px 0 0;font-size:13px">bat / Sublime / any base16 tool</p></div>
     <div class="card"><h3><i style="background:var(--accent)"></i>System (macOS)</h3>
-      <div class="chips"><span class="chip">accent color</span><span class="chip">Raycast</span></div></div>
+      <div class="chips"><span class="chip">accent color</span><span class="chip">window borders</span><span class="chip">Raycast</span></div></div>
   </div>
 </section>
 
@@ -258,13 +258,13 @@
 
   // tool -> category color
   const tools = [
-    ['ghostty', C.cyan],
+    ['ghostty', C.cyan], ['kitty', C.cyan], ['alacritty', C.cyan], ['wezterm', C.cyan], ['warp', C.cyan],
     ['tmux', C.green], ['btop', C.green], ['fzf', C.green],
-    ['lazygit', C.green], ['yazi', C.green], ['herdr', C.green],
-    ['cursor', C.purple], ['vscode', C.purple], ['zed', C.purple], ['neovim', C.purple],
-    ['opencode', C.pink], ['claude code', C.pink], ['hunk', C.pink],
+    ['lazygit', C.green], ['yazi', C.green],
+    ['cursor', C.purple], ['vscode', C.purple], ['zed', C.purple], ['neovim', C.purple], ['sublime', C.purple],
+    ['opencode', C.pink], ['claude code', C.pink], ['hunk', C.pink], ['herdr', C.pink],
     ['bat', C.orange],
-    ['raycast', C.accent], ['macOS accent', C.accent],
+    ['raycast', C.accent], ['macOS accent', C.accent], ['window borders', C.accent],
   ];
 
   const n = tools.length;

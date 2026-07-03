@@ -52,12 +52,12 @@ match what you'd see in the editor.
 
 | Surface | Tools |
 | --- | --- |
-| Terminals | ghostty, any 16-ANSI terminal |
+| Terminals | ghostty, kitty, alacritty, WezTerm, Warp — any 16-ANSI terminal |
 | Multiplexers / TUI | tmux, btop, fzf, yazi, lazygit |
-| Editors | VSCode, Cursor, Zed, Neovim (chrome + TextMate syntax) |
-| Agents / dev | opencode, Claude Code, hunk |
+| Editors | VSCode, Cursor, Zed, Neovim, Sublime Text (chrome + TextMate syntax) |
+| Agents / dev | opencode, Claude Code, hunk, herdr |
 | Syntax export | `.tmTheme` (bat/Sublime), shiki JSON, base16 |
-| macOS / extras | system accent color, Raycast, herdr |
+| macOS / extras | system accent color, window borders (JankyBorders, rift), Raycast |
 
 Each target detects whether the tool is present and no-ops if not, so you only
 theme what you have.
