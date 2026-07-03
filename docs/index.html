@@ -201,7 +201,11 @@
 <span class="k">theme</span> set catppuccin-mocha
 
 <span class="c"># the active theme</span>
-<span class="k">theme</span> current</pre>
+<span class="k">theme</span> current
+
+<span class="c"># follow the system light/dark mode (macOS)</span>
+<span class="k">theme</span> pair set github-light tokyo-night
+<span class="k">theme</span> watch install</pre>
     </div>
   </div>
   <p class="lead" style="margin-top:18px">Full launcher + per-tool wiring:
@@ -218,7 +222,8 @@
     <div class="card">
       <h3>Add a tool adapter</h3>
       <p>A <code>to*(theme)</code> function returns your tool's format; a target writes it and reloads.
-        Most adapters are 20–40 lines.</p>
+        Most adapters are 20–40 lines. Personal adapters can live in
+        <code>~/.config/monotheme/targets/</code> — no fork needed.</p>
       <a class="btn ghost" href="https://github.com/eduwass/monotheme/blob/main/docs/ADAPTERS.md">Adapter guide</a>
     </div>
     <div class="card">
