@@ -93,6 +93,18 @@ theme raycast              # open the active theme as a Raycast import (macOS)
 theme check                # self-check, no writes
 ```
 
+### System light/dark switching (macOS)
+
+Pick a theme for each appearance, and monotheme follows the OS — whether you
+toggle it by hand or the schedule flips it at sunset:
+
+```sh
+theme pair set github-light tokyo-night   # light theme, dark theme
+theme watch install                       # launchd agent: switches within ~2s of the flip
+theme auto                                # one-shot: apply whichever half matches right now
+theme watch status|uninstall              # inspect / remove the agent
+```
+
 Themes resolve from bundled defaults, your **installed editor extensions** (it
 discovers Cursor/VSCode themes on disk — including each editor's *built-in* themes
 like Dark Modern / Monokai), and `~/.config/monotheme/themes/` (vendored + custom).
@@ -141,9 +153,15 @@ via the ported matcher → each **adapter** renders that into one tool's format 
 
 ## Adding a tool
 
-Adapters are small and self-contained. See [`docs/ADAPTERS.md`](docs/ADAPTERS.md)
-for the contract and a step-by-step walkthrough. Contributions welcome — if you
-theme a tool, others get it for free.
+Adapters are small and self-contained — one file per tool. Two places to put one:
+
+- **`src/targets/`** (in the repo) — for tools worth shipping to everyone. PRs welcome.
+- **`~/.config/monotheme/targets/`** (your config dir) — personal adapters, no repo
+  checkout needed. Export a plain object; same-name overrides a built-in; a broken
+  file warns and is skipped. Perfect for sketchybar, waybar, a personal dashboard, …
+
+See [`docs/ADAPTERS.md`](docs/ADAPTERS.md) for the contract and a step-by-step
+walkthrough. If you theme a tool, others get it for free.
 
 ## License
 
