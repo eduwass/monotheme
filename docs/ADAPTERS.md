@@ -141,3 +141,25 @@ const kw = resolveToken(c.theme.tokenColors, "keyword")?.fg ?? c.palette.accent;
       output — see the `terminal adapters` test for the pattern)
 - [ ] `theme set <name>` shows your tool applying cleanly
 - [ ] paths go through `c.config`/`c.appSupport`/`c.home` (no hardcoded `~/.config`)
+
+## User adapters (outside the repo)
+
+The same one-file contract works without touching the repo: drop a `.ts` file in
+`~/.config/monotheme/targets/` and it's loaded after the built-ins on every
+`theme set`. Export a **plain object** (no import needed — the registry validates it
+with the same rules as `defineTarget`):
+
+```ts
+// ~/.config/monotheme/targets/sketchybar.ts
+export default {
+  name: "sketchybar",
+  detect: (c) => c.hasCmd("sketchybar"),
+  file:   (c) => c.config("sketchybar", "colors.sh"),
+  render: (c) => `export BAR_BG=0xff${c.palette.bg.slice(1)}\nexport BAR_ACCENT=0xff${c.palette.accent.slice(1)}\n`,
+  reload: () => "sketchybar --reload",
+};
+```
+
+- A user target with the same `name` as a built-in **replaces** it — re-skin a stock
+  adapter without forking.
+- A broken user file warns and is skipped; it never breaks `theme set`.

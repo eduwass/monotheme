@@ -52,3 +52,10 @@ export function raycastImportUrl(theme: VscodeTheme): string {
   ];
   return `raycast://theme?${params.join("&")}`;
 }
+
+/** Build the deeplink for Raycast's built-in "Switch Theme" command, pre-filled
+ * with a theme name already present in Raycast's theme list — applies directly,
+ * no import confirmation. */
+export function raycastSwitchUrl(themeName: string): string {
+  return `raycast://extensions/raycast/raycast/switch-theme?arguments=${encodeURIComponent(JSON.stringify({ theme: themeName }))}`;
+}

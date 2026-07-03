@@ -20,8 +20,8 @@ import { peerThemeCommand } from "./sync.ts";
 import { makeCtx, applyTarget } from "./target-kit.ts";
 import { toTmTheme } from "./formats/tmtheme.ts";
 import { toGhostty } from "./targets/ghostty.ts";
-import { raycastImportUrl } from "./formats/raycast.ts";
-import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, PAIR, WATCH_SCRIPT, WATCH_LOG, WATCH_PLIST, WATCH_LABEL, migrateConfigHome, hydrateDefaults } from "./paths.ts";
+import { raycastImportUrl, raycastSwitchUrl } from "./formats/raycast.ts";
+import { STATE, ACTIVE, FONTS, USER_THEMES, REPO_THEMES, CONFIG_HOME, PAIR, RAYCAST_IMPORTED, WATCH_SCRIPT, WATCH_LOG, WATCH_PLIST, WATCH_LABEL, migrateConfigHome, hydrateDefaults } from "./paths.ts";
 import { loadFonts, resolveFont, FONT_ROLES, type FontRole, type FontsConfig } from "./fonts.ts";
 import { catalogWithStatus, findFont, installFont, resolveFamily } from "./fonts-catalog.ts";
 import { toPreviewSvg } from "./preview.ts";
@@ -263,18 +263,32 @@ switch (cmd) {
     break;
   }
   case "raycast": {
-    // Raycast stores themes in an encrypted DB (no silent write), so the only
-    // sanctioned apply path is its import deeplink — one confirm click. Build it
-    // from the active theme and open it. Raycast is macOS-only; elsewhere we just
-    // print the URL to open on a Mac.
+    // Raycast stores themes in an encrypted DB (no silent write), so there's no
+    // way to check membership directly — we track "already imported into Raycast"
+    // ourselves. First time we see a theme name: open the import deeplink (one
+    // confirm click) and remember it. Every time after: fire the built-in
+    // "Switch Theme" command deeplink with the name pre-filled — applies
+    // directly, no import prompt. Raycast is macOS-only; elsewhere we just print
+    // the URL to open on a Mac.
     let theme;
     if (existsSync(ACTIVE)) theme = loadTheme(ACTIVE);
     else if (existsSync(STATE)) theme = loadTheme(resolveTheme(readFileSync(STATE, "utf8").trim())!.path);
     else { console.error("theme: no active theme (run: theme set <name>)"); process.exit(1); }
-    const url = raycastImportUrl(theme);
-    if (process.platform !== "darwin") { console.log(`raycast: open this on your Mac to import:\n  ${url}`); break; }
-    try { execSync(`open '${url}'`, { stdio: "ignore" }); console.log(`raycast: opened import for ${theme.name} — confirm in Raycast`); }
-    catch { console.log(`raycast: open this to import:\n  ${url}`); }
+
+    let imported: string[] = [];
+    try { imported = JSON.parse(readFileSync(RAYCAST_IMPORTED, "utf8")); } catch {}
+    const known = imported.includes(theme.name);
+    const url = known ? raycastSwitchUrl(theme.name) : raycastImportUrl(theme);
+
+    if (process.platform !== "darwin") { console.log(`raycast: open this on your Mac to ${known ? "switch" : "import"}:\n  ${url}`); break; }
+    try {
+      execSync(`open '${url}'`, { stdio: "ignore" });
+      console.log(known ? `raycast: switched to ${theme.name}` : `raycast: opened import for ${theme.name} — confirm in Raycast`);
+      if (!known) {
+        mkdirSync(CONFIG_HOME, { recursive: true });
+        writeFileSync(RAYCAST_IMPORTED, JSON.stringify([...new Set([...imported, theme.name])]));
+      }
+    } catch { console.log(`raycast: open this to ${known ? "switch" : "import"}:\n  ${url}`); }
     break;
   }
   case "sync": {
