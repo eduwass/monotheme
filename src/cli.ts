@@ -11,7 +11,7 @@
 //   theme watch install         switch automatically as macOS appearance changes (launchd)
 import { writeFileSync, readFileSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { loadTheme, stripAlpha } from "./load.ts";
 import { project } from "./project.ts";
 import { discover, resolveTheme, slugify } from "./discover.ts";
@@ -36,7 +36,7 @@ const [cmd, ...rest] = process.argv.slice(2);
 
 // Resolve a `theme set` argument: a theme name/slug, OR a path to a theme JSON
 // (used by cross-machine sync, where the peer may not have the theme installed).
-function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canonical: string } {
+async function applyTheme(nameOrPath: string, opSilent = false, doPropagate = false): Promise<{ slug: string; canonical: string }> {
   let theme, entry;
   if (nameOrPath.endsWith(".json") && existsSync(nameOrPath)) {
     theme = loadTheme(nameOrPath);
@@ -53,15 +53,20 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
   const p = project(theme);
   if (p.warnings.length && !opSilent) for (const w of p.warnings) console.warn(`  ! ${w}`);
 
-  const ctx = makeCtx(theme, p, entry, loadFonts());
+  // canonical = the fully-resolved theme; portable across machines.
+  const canonical = JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors });
+  // kick off the (slow, ssh-bound) peer sync FIRST so it overlaps the local apply.
+  const peerMsg = doPropagate ? propagate(canonical) : Promise.resolve(null);
+  // config writes run synchronously (fast); reload signals collect into `pending`
+  // and fire concurrently, so every app repaints at once instead of in sequence.
+  const pending: Promise<void>[] = [];
+  const ctx = makeCtx(theme, p, entry, loadFonts(), "monotheme", pending);
   for (const t of TARGETS) {
     const r = applyTarget(t, ctx);
     if (!opSilent) console.log(`  ${r.present ? (r.ok ? "✓" : "✗") : "·"} ${r.status}`);
   }
   mkdirSync(CONFIG_HOME, { recursive: true });
   writeFileSync(STATE, entry.slug + "\n");
-  // canonical = the fully-resolved theme; portable across machines.
-  const canonical = JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors });
   writeFileSync(ACTIVE, canonical + "\n");
   // vendor editor-sourced themes into the config-home themes/ dir so they're
   // discoverable on every machine (e.g. servers with no editor extensions
@@ -77,22 +82,27 @@ function applyTheme(nameOrPath: string, opSilent = false): { slug: string; canon
       if (!opSilent) console.log(`  ✓ vendored → ${vendored.replace(process.env.HOME || "~", "~")}`);
     }
   }
+  await Promise.all(pending);
+  const msg = await peerMsg;
+  if (msg) console.log(msg);
   if (!opSilent) console.log(`\nset: ${theme.name} (${theme.type})`);
   return { slug: entry.slug, canonical };
 }
 
 // Mirror the switch to the peer machine by shipping the resolved theme itself
-// (not just its name — the peer may not have it installed). Best-effort, non-blocking.
-function propagate(canonical: string): void {
+// (not just its name — the peer may not have it installed). Best-effort; runs
+// concurrently with the local apply and resolves to a status line to print.
+function propagate(canonical: string): Promise<string | null> {
   const b64 = Buffer.from(canonical).toString("base64");
   const peer = peerThemeCommand(b64);
-  if (!peer) return;
-  try {
-    execSync(peer.cmd, { stdio: "ignore", timeout: 30000 });
-    console.log(`  ↪ synced ${peer.peer}`);
-  } catch {
-    console.log(`  · ${peer.peer} not synced (unreachable) — it'll match next time it's set there`);
-  }
+  if (!peer) return Promise.resolve(null);
+  const fail = `  · ${peer.peer} not synced (unreachable) — it'll match next time it's set there`;
+  return new Promise((res) => {
+    const ch = spawn(peer.cmd, { shell: true, stdio: "ignore" });
+    const t = setTimeout(() => { try { ch.kill("SIGKILL"); } catch {} }, 30000);
+    ch.on("error", () => { clearTimeout(t); res(fail); });
+    ch.on("exit", (code) => { clearTimeout(t); res(code === 0 ? `  ↪ synced ${peer.peer}` : fail); });
+  });
 }
 
 // A Marketplace theme is only colour DATA for terminals/etc.; Cursor/VSCode need
@@ -156,10 +166,9 @@ switch (cmd) {
   case "set": {
     const args = rest.filter((r) => !r.startsWith("--"));
     if (!args[0]) { console.error("usage: theme set <name> [--no-propagate]"); process.exit(1); }
-    const { canonical } = applyTheme(args[0]);
-    // sync the peer machine unless told not to (the peer passes --no-propagate
-    // back to avoid an echo loop).
-    if (!rest.includes("--no-propagate")) propagate(canonical);
+    // peer sync happens inside applyTheme (overlapped with the local apply) unless
+    // told not to (the peer passes --no-propagate back to avoid an echo loop).
+    await applyTheme(args[0], false, !rest.includes("--no-propagate"));
     break;
   }
   case "current": {
@@ -200,8 +209,7 @@ switch (cmd) {
     const cur = existsSync(STATE) ? readFileSync(STATE, "utf8").trim() : "";
     const targetSlug = resolveTheme(target)?.slug ?? slugify(target);
     if (targetSlug === cur) { break; } // already matches, no-op
-    const { canonical } = applyTheme(target, rest.includes("--quiet"));
-    if (!rest.includes("--no-propagate")) propagate(canonical);
+    await applyTheme(target, rest.includes("--quiet"), !rest.includes("--no-propagate"));
     break;
   }
   case "watch": {
@@ -258,8 +266,8 @@ switch (cmd) {
   case "init": {
     // prefer the canonical .active.json (works even for themes not installed
     // here, e.g. an editor theme synced from the Mac); fall back to the slug.
-    if (existsSync(ACTIVE)) applyTheme(ACTIVE, true);
-    else if (existsSync(STATE)) applyTheme(readFileSync(STATE, "utf8").trim(), true);
+    if (existsSync(ACTIVE)) await applyTheme(ACTIVE, true);
+    else if (existsSync(STATE)) await applyTheme(readFileSync(STATE, "utf8").trim(), true);
     break;
   }
   case "raycast": {
@@ -600,8 +608,8 @@ async function runFont(argv: string[]): Promise<void> {
     console.log(`font: ${role}${role === "mono" ? " (everywhere)" : ""} → ${prevSpec.family ?? "(inherit)"}${prevSpec.size != null ? ` ${prevSpec.size}` : ""}`);
 
     // re-apply the active theme so the font change lands now.
-    if (existsSync(ACTIVE)) applyTheme(ACTIVE, true);
-    else if (existsSync(STATE)) applyTheme(readFileSync(STATE, "utf8").trim(), true);
+    if (existsSync(ACTIVE)) await applyTheme(ACTIVE, true);
+    else if (existsSync(STATE)) await applyTheme(readFileSync(STATE, "utf8").trim(), true);
     console.log("  ✓ applied");
     return;
   }

@@ -6,7 +6,7 @@
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import type { VscodeTheme } from "./load.ts";
 import type { Projection } from "./project.ts";
 import type { ThemeEntry } from "./discover.ts";
@@ -107,8 +107,11 @@ export function defineTarget(t: Target): Target {
 const HOME = homedir();
 const osOf = (): OS => (process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux");
 
-/** Build the context for one theme application. */
-export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, fonts: FontsConfig | null = null, slot = "monotheme"): Ctx {
+/** Build the context for one theme application. When `pending` is given, `run`
+ *  commands (reload signals) are spawned concurrently and collected there instead
+ *  of blocking one-by-one — await Promise.all(pending) after applying all targets
+ *  so every app repaints at once rather than in serial order. */
+export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, fonts: FontsConfig | null = null, slot = "monotheme", pending?: Promise<void>[]): Ctx {
   const os = osOf();
   const cfgRoot = process.env.XDG_CONFIG_HOME || (os === "win" ? process.env.APPDATA || join(HOME, "AppData", "Roaming") : join(HOME, ".config"));
   const dataRoot = process.env.XDG_DATA_HOME || (os === "win" ? process.env.LOCALAPPDATA || join(HOME, "AppData", "Local") : join(HOME, ".local", "share"));
@@ -121,10 +124,23 @@ export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEnt
     data: (...p) => join(dataRoot, ...p),
     home: (...p) => join(HOME, ...p),
     has: (path) => existsSync(path),
-    hasCmd: (cmd) => { try { execSync(`command -v ${cmd}`, { stdio: "ignore" }); return true; } catch { return false; } },
+    hasCmd: (cmd) =>
+      typeof Bun !== "undefined"
+        ? Bun.which(cmd) !== null // no subprocess — ~100x faster than shelling out per detect
+        : (() => { try { execSync(`command -v ${cmd}`, { stdio: "ignore" }); return true; } catch { return false; } })(),
     write: (path, content) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, content); },
     read: (path) => { try { return readFileSync(path, "utf8"); } catch { return ""; } },
-    run: (cmd) => { try { execSync(cmd, { stdio: "ignore" }); } catch {} },
+    run: (cmd) => {
+      if (!pending) { try { execSync(cmd, { stdio: "ignore" }); } catch {} return; }
+      pending.push(new Promise<void>((res) => {
+        const ch = spawn(cmd, { shell: true, stdio: "ignore" });
+        // cap a hung reload at 15s (execSync had no cap at all); errors stay swallowed.
+        const t = setTimeout(() => { try { ch.kill("SIGKILL"); } catch {} }, 15000);
+        const done = () => { clearTimeout(t); res(); };
+        ch.on("error", done);
+        ch.on("exit", done);
+      }));
+    },
     setJson: (file, key, value) => patchJsonStringKey(file, key, value),
     font: (role) => resolveFont(fonts, role),
   };
