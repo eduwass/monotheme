@@ -43,7 +43,10 @@ export default defineTarget({
       ? s.replace(/\[theme\.custom\][\s\S]*$/, toHerdrTheme(c.theme))
       : s + "\n" + toHerdrTheme(c.theme);
     c.write(conf, s);
-    c.run("herdr server reload-config");
-    return "[theme.custom] (reload-config)";
+    // Named Herdr sessions own separate servers and in-memory palettes.
+    c.run(
+      "herdr session list | awk 'NR > 1 && $2 == \"running\" { if ($1 == \"default\") print \"herdr server reload-config\"; else print \"herdr --session \" $1 \" server reload-config\" }' | sh",
+    );
+    return "[theme.custom] (reload-config all sessions)";
   },
 });
