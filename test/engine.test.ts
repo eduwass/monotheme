@@ -226,6 +226,29 @@ test("lazygit: theme block maps roles + in-place replace preserves git.pagers", 
   expect(out).not.toContain('- "#000"');
 });
 
+test("tuicr: emits exactly the required key set, every color a strict #RRGGBB", () => {
+  const { toTuicr, TUICR_KEYS } = require("../src/targets/tuicr.ts");
+  for (const theme of [sop, gh]) {
+    const p = project(theme);
+    const out = toTuicr(theme, p);
+    // tuicr hard-errors on a missing key and warns on an unknown one, so the
+    // emitted set must match its schema exactly — not merely be a superset.
+    expect(Object.keys(out).sort()).toEqual([...TUICR_KEYS].sort());
+    for (const [k, v] of Object.entries(out) as [string, string][]) {
+      if (k === "syntax_theme") continue; // the only non-color key: a .tmTheme path
+      // is_supported_color_value() accepts ONLY 6 hex digits — no alpha, no #rgb
+      expect(v).toMatch(/^#[0-9a-fA-F]{6}$/);
+    }
+    expect(out.syntax_theme).toBe("monotheme.tmTheme");
+    // a TUI has no hover states: separators/highlights must not equal the bg
+    expect(out.border_unfocused).not.toBe(out.panel_bg);
+    expect(out.bg_highlight).not.toBe(out.panel_bg);
+    expect(out.cursor_line_bg).not.toBe(out.panel_bg);
+    // diff bands must read as add/del, not as one indistinguishable wash
+    expect(out.diff_add_bg).not.toBe(out.diff_del_bg);
+  }
+});
+
 test("mix: blends two hex colors for readable muted ladders", () => {
   const { mix } = require("../src/load.ts");
   expect(mix("#000000", "#ffffff", 0.5)).toBe("#808080");

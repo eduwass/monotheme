@@ -55,7 +55,7 @@ match what you'd see in the editor.
 | Terminals | ghostty, kitty, alacritty, WezTerm, Warp — any 16-ANSI terminal |
 | Multiplexers / TUI | tmux, btop, fzf, yazi, lazygit |
 | Editors | VSCode, Cursor, Zed, Neovim, Sublime Text (chrome + TextMate syntax) |
-| Agents / dev | opencode, Claude Code, hunk, herdr |
+| Agents / dev | opencode, Claude Code, hunk, tuicr, herdr |
 | Syntax export | `.tmTheme` (bat/Sublime), shiki JSON, base16 |
 | macOS / extras | system accent color, window borders (JankyBorders, rift), Raycast |
 
