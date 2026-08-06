@@ -14,7 +14,6 @@ export function toHerdrTheme(theme: VscodeTheme): string {
   const a = p.ansi;
   const ladder = (t: number) => mix(p.bg, p.fg, t);
   return `[theme.custom]
-base        = "${p.bg}"
 panel_bg    = "${p.bg}"
 surface_dim = "${p.bgPanel}"
 surface0    = "${ladder(0.08)}"
