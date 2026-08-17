@@ -286,3 +286,21 @@ test("slugify + discover: labels normalize, local themes are found", () => {
   expect(slugs).toContain("shades-of-purple");
   expect(slugs).toContain("github-dark");
 });
+
+test("omarchy adapter: emits a complete v4 colors.toml from the projection", () => {
+  const { toOmarchy } = require("../src/targets/omarchy.ts");
+  const p = project(sop);
+  const o = toOmarchy(sop);
+  expect(o).toContain('mode = "dark"');
+  expect(o).toContain(`background = "${stripAlpha(p.bg)}"`);
+  expect(o).toContain(`foreground = "${stripAlpha(p.fg)}"`);
+  expect(o).toContain(`accent = "${stripAlpha(p.accent)}"`);
+  expect(o).toContain(`red = "${stripAlpha(p.ansi[1])}"`);
+  expect(o).toContain(`bright_magenta = "${stripAlpha(p.ansi[13])}"`);
+  // every key the shipped omarchy themes carry must be present
+  for (const k of ["selection","muted","dark_background","darker_background","lighter_background",
+                   "dark_foreground","light_foreground","bright_foreground","orange","brown",
+                   "yellow","green","cyan","blue","magenta","bright_red","bright_yellow",
+                   "bright_green","bright_cyan","bright_blue"])
+    expect(o).toMatch(new RegExp(`^${k} = "#[0-9a-fA-F]{6}"$`, "m"));
+});
