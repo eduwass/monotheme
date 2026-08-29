@@ -5,6 +5,9 @@ import { defineTarget } from "../target-kit.ts";
 // so we synthesize them by blending bg→fg rather than reusing the dark border.
 // panel_bg fills the tab bar (src/ui/tabs.rs) and panel chrome — set it to the
 // base bg so the tab strip blends in instead of reading as a darker line.
+// active_row_bg / selection_bg (herdr >= 0.8) back the active workspace/agent
+// rows and the Navigate cursor in the sidebar; left unset they fall back to the
+// base theme (catppuccin-mocha), which paints dark rows on light themes.
 import type { VscodeTheme } from "../load.ts";
 import { mix } from "../load.ts";
 import { project } from "../project.ts";
@@ -16,6 +19,8 @@ export function toHerdrTheme(theme: VscodeTheme): string {
   return `[theme.custom]
 panel_bg    = "${p.bg}"
 surface_dim = "${p.bgPanel}"
+active_row_bg = "${p.bgPanel}"
+selection_bg  = "${ladder(0.16)}"
 surface0    = "${ladder(0.08)}"
 surface1    = "${ladder(0.16)}"
 overlay0    = "${ladder(0.38)}"
