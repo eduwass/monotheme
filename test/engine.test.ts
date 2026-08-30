@@ -304,3 +304,22 @@ test("omarchy adapter: emits a complete v4 colors.toml from the projection", () 
                    "bright_green","bright_cyan","bright_blue"])
     expect(o).toMatch(new RegExp(`^${k} = "#[0-9a-fA-F]{6}"$`, "m"));
 });
+
+test("snap adapter: emits one complete authored token set", () => {
+  const { toSnap, SNAP_TOKEN_KEYS } = require("../src/targets/snap.ts");
+  const p = project(sop);
+  const out = JSON.parse(toSnap(sop));
+  const keys = Object.keys(out).filter((key) => !["v", "surfaces"].includes(key));
+  expect(keys.sort()).toEqual([...SNAP_TOKEN_KEYS].sort());
+  expect(out.v).toBe(1);
+  expect(out.surface).toBe(p.bg);
+  expect(out.surface_raised).toBe(p.bgPanel);
+  expect(out.accent).toBe(p.accent);
+  expect(out.accent_text).toBe(stripAlpha(sop.colors["button.foreground"]!));
+  expect(out.focus_border).toBe(p.borderActive);
+  expect(out.danger).toBe(p.error);
+  expect(out.surfaces.halo.accent).toBe(p.accent);
+  expect(out.surfaces.halo.shadow_md.color).toBe("accent");
+  for (const key of SNAP_TOKEN_KEYS.slice(0, 13))
+    expect(out[key]).toMatch(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$/);
+});
