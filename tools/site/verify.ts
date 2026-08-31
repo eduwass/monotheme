@@ -74,6 +74,20 @@ await waitFor(`__mt.state().selected?.name?.toLowerCase().includes('catppuccin')
 await waitFor(`document.querySelector('#status').hidden`);
 await sleep(300); await shot("6-search-pick");
 
+// inspector: tweak accent → ring/pill repaint, share link roundtrips, reset clears
+await evalJs(`document.querySelector('#inspector').open = true`);
+await evalJs(`__mt.tweak('button.background', '#ff0055')`); await sleep(400);
+const pill = await evalJs(`getComputedStyle(document.querySelector('#desktop')).getPropertyValue('--pill-focused-bg').trim()`);
+if (pill !== "#ff0055") problems.push(`tweak did not reach the pills: ${pill}`);
+if (!(await evalJs("location.hash")).includes("~")) problems.push("tweak missing from share URL");
+const shareUrl = await evalJs("location.href");
+await send("Page.navigate", { url: shareUrl }); await sleep(300);
+await waitFor(`window.__mt && Object.keys(__mt.overrides()).length > 0`, 40000);
+console.log("share link restores overrides:", JSON.stringify(await evalJs("__mt.overrides()")));
+await evalJs(`document.querySelector('#inspector').open = true`); await sleep(200); await shot("9-inspector");
+await evalJs(`document.querySelector('#insp-reset').click()`); await sleep(300);
+if (Object.keys(await evalJs("__mt.overrides()")).length) problems.push("reset left overrides behind");
+
 // deep link reload
 await send("Page.navigate", { url: URL_.replace(/#.*/, "") + "#m/enkia.tokyo-night/tokyo-night-storm" });
 await sleep(300);

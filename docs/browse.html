@@ -62,6 +62,8 @@
   .row .sub { grid-area:sub; font-size:12px; color:var(--muted); }
   .row .sw { grid-area:sw; width:22px; height:22px; border-radius:var(--r-sm); border:2px solid; align-self:center; position:relative; overflow:hidden; }
   .row .sw b { position:absolute; right:0; bottom:0; width:10px; height:10px; border-radius:var(--r-sm) 0 0 0; }
+  .row .sw.ico { border-color:var(--line); background:var(--panel); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700; color:var(--muted); }
+  .row .sw.ico img { width:100%; height:100%; object-fit:cover; display:block; }
   .row:not(:has(.sw)) { grid-template-columns:1fr; grid-template-areas:"name" "sub"; }
   #more { margin:8px 16px 0; padding:8px; width:calc(100% - 32px); border:1px dashed var(--line); border-radius:var(--r-md); color:var(--muted); font-size:13px; }
   #more:hover { color:var(--fg); border-color:var(--muted); }
@@ -162,6 +164,28 @@
   .h-pane .bottom { margin-top:auto; }
   .h-pane .cursor { display:inline-block; width:.55em; height:1em; background:var(--term-text); vertical-align:-.15em; }
   .h-pane .ansi { display:flex; gap:.3em; margin-top:.5em; } .h-pane .ansi i { width:1.1em; height:.8em; display:block; border-radius:.15em; }
+
+  /* ── inspector ── */
+  .insp { border:1px solid var(--line); border-radius:var(--r-lg); background:var(--bg2); box-shadow:0 1px 2px rgba(0,0,0,.06); }
+  .insp summary { padding:13px 16px; cursor:pointer; font-weight:600; font-size:14px; color:var(--muted); list-style:none; display:flex; align-items:center; gap:8px; }
+  .insp summary::before { content:"▸"; font-size:11px; transition:rotate .15s; }
+  .insp[open] summary::before { rotate:90deg; }
+  .insp[open] summary { color:var(--fg); border-bottom:1px solid var(--line); }
+  .insp-actions { display:flex; gap:8px; align-items:center; padding:12px 16px 0; }
+  #insp-hint { font-size:12px; color:var(--muted); margin-right:auto; }
+  .insp .btn { padding:6px 11px; font-size:12px; }
+  .insp .btn:disabled { opacity:.45; cursor:default; }
+  .insp-h { margin:14px 16px 0; font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; }
+  .insp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:2px 14px; padding:10px 16px 16px; }
+  .insp-grid.ansi { grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); }
+  .insp-row { display:grid; grid-template-columns:auto auto 1fr; align-items:center; gap:10px; padding:5px 6px; border-radius:var(--r-md); }
+  .insp-row:hover { background:var(--panel); }
+  .insp-row input[type=color] { width:26px; height:26px; padding:0; border:1px solid var(--line); border-radius:var(--r-sm); background:none; cursor:pointer; }
+  .insp-row input[type=color]::-webkit-color-swatch-wrapper { padding:2px; }
+  .insp-row input[type=color]::-webkit-color-swatch { border:0; border-radius:3px; }
+  .insp-row .rname { font-size:13px; font-weight:600; white-space:nowrap; }
+  .insp-row .rname small { display:block; font-weight:400; font-family:var(--mono); font-size:10px; color:var(--muted); }
+  .insp-row .rnote { font-size:11px; color:var(--muted); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
   /* ── use it ── */
   .use { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:14px; align-items:center; background:var(--bg2); border:1px solid var(--line); border-radius:var(--r-lg); padding:14px 16px; box-shadow:0 1px 2px rgba(0,0,0,.06); }
@@ -316,6 +340,19 @@
         </div>
       </section>
     </div>
+
+    <details class="insp" id="inspector">
+      <summary>Colors &amp; assignments — inspect and tweak</summary>
+      <div class="insp-actions">
+        <span id="insp-hint">every swatch is live — tweaks re-run the real adapters</span>
+        <button class="btn" id="insp-reset" disabled>reset</button>
+        <button class="btn" id="insp-share" disabled>copy share link</button>
+        <button class="btn" id="insp-dl" disabled>download json</button>
+      </div>
+      <div class="insp-grid" id="insp-roles"></div>
+      <h3 class="insp-h">terminal ansi</h3>
+      <div class="insp-grid ansi" id="insp-ansi"></div>
+    </details>
 
     <div class="use">
       <div>

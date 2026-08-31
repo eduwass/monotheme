@@ -9,7 +9,8 @@ import tsLang from "shiki/langs/typescript.mjs";
 import type { VscodeTheme } from "../../src/load.ts";
 import { searchThemes, SORT, type MarketTheme } from "../../src/market-search.ts";
 import { slugify } from "../../src/slug.ts";
-import { desktopVars, shellVars, type Flavor } from "./palette.ts";
+import { ANSI_KEYS } from "../../src/project.ts";
+import { desktopVars, shellVars, canonicalTheme, ROLE_SPECS, ANSI_NAMES, type Flavor } from "./palette.ts";
 import { readCentralDirectory, readTextEntry, inflateRawWeb } from "./zip.ts";
 import { CATALOG, DEFAULT_THEME, THEMES_BASE, type CatalogEntry } from "./catalog.gen.ts";
 
@@ -35,6 +36,8 @@ interface Selected { theme: VscodeTheme; source: { kind: "builtin"; slug: string
 let selected: Selected | null = null;
 let flavor: Flavor = "vscode";
 let focused: "editor" | "herdr" = "editor";
+let overrides: Record<string, string> = {};
+let pendingOverrides: Record<string, string> | null = null; // parsed from a share link, applied on next selection
 let hl: HighlighterCore;
 let themeSeq = 0;
 
@@ -112,6 +115,37 @@ function loadExtension(ext: MarketTheme): Promise<Extracted> {
   return p;
 }
 
+// ── tweaks ─────────────────────────────────────────────────────────────────
+const dirty = () => Object.keys(overrides).length > 0;
+function effectiveTheme(): VscodeTheme {
+  const t = selected!.theme;
+  return dirty() ? { ...t, colors: { ...t.colors, ...overrides } } : t;
+}
+function tweak(key: string, value: string) {
+  // project() honours terminal.ansi* only when ALL 16 exist — materialise the
+  // currently-derived palette first so a single ANSI tweak takes effect.
+  if (key.startsWith("terminal.ansi") && !ANSI_KEYS.every((k) => effectiveTheme().colors[k])) {
+    const cur = desktopVars(effectiveTheme(), flavor).p.ansi;
+    for (let i = 0; i < 16; i++) overrides[ANSI_KEYS[i]!] ??= cur[i]!;
+  }
+  overrides[key] = value;
+  paint();
+}
+const b64e = (o: object) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+const b64d = (t: string) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t.replaceAll("-", "+").replaceAll("_", "/")), (c) => c.charCodeAt(0))));
+
+function renderInspector(d: ReturnType<typeof desktopVars>) {
+  const roleRow = (name: string, key: string, val: string, note: string, mono = false) =>
+    `<label class="insp-row"><input type="color" value="${val}" data-key="${esc(key)}"><span class="rname">${esc(name)}${mono ? "" : `<small>${esc(key)}</small>`}</span><span class="rnote">${esc(note)}</span></label>`;
+  $("#insp-roles").innerHTML = ROLE_SPECS.map((r) => roleRow(r.role, r.key, r.get(d.p), r.note)).join("");
+  $("#insp-ansi").innerHTML = d.p.ansi.map((c, i) => roleRow(ANSI_NAMES[i]!, ANSI_KEYS[i]!, c, "", true)).join("");
+  document.querySelectorAll<HTMLInputElement>(".insp-row input").forEach((inp) => {
+    let raf = 0;
+    inp.oninput = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => tweak(inp.dataset.key!, inp.value)); };
+  });
+  for (const b of ["insp-reset", "insp-share", "insp-dl"]) ($(`#${b}`) as HTMLButtonElement).disabled = !dirty();
+}
+
 // ── rendering ──────────────────────────────────────────────────────────────
 async function highlight(theme: VscodeTheme): Promise<string> {
   const name = `mt-${++themeSeq}`;
@@ -128,7 +162,8 @@ function setStatus(msg: string, kind: "info" | "error" | "" = "") {
 
 async function paint() {
   if (!selected) return;
-  const { theme, source } = selected;
+  const { source } = selected;
+  const theme = effectiveTheme();
   const d = desktopVars(theme, flavor);
   const desk = $("#desktop");
   for (const [k, v] of Object.entries(d.vars)) desk.style.setProperty(k, v);
@@ -145,7 +180,9 @@ async function paint() {
   $("#meta-type").textContent = theme.type;
   $("#meta-type").dataset.type = theme.type;
   $("#meta-src").textContent = source.kind === "builtin" ? "ships with monotheme" : `${source.ext.id} · ${fmtInstalls(source.ext.installs)} installs`;
-  const cmd = source.kind === "builtin" ? `theme set ${slug}` : `theme add ${source.ext.id} && theme set ${slug}`;
+  const cmd = dirty()
+    ? `theme set ~/Downloads/${slug}-tweaked.json   # download json above first`
+    : source.kind === "builtin" ? `theme set ${slug}` : `theme add ${source.ext.id} && theme set ${slug}`;
   $("#cmd").textContent = cmd;
   $("#open-market").hidden = source.kind !== "market";
   if (source.kind === "market") $<HTMLAnchorElement>("#open-market").href = `https://marketplace.visualstudio.com/items?itemName=${source.ext.id}`;
@@ -153,7 +190,9 @@ async function paint() {
   swatches.innerHTML = d.p.ansi.map((c, i) => `<i title="ansi ${i}" style="background:${c}"></i>`).join("");
   // replaceState, not location.hash: assigning the hash fires hashchange and
   // would re-run the (network) hash router after every local selection.
-  history.replaceState(null, "", source.kind === "builtin" ? `#t/${slug}` : `#m/${source.ext.id}/${slug}`);
+  const tweaks = dirty() ? `~${b64e(overrides)}` : "";
+  history.replaceState(null, "", (source.kind === "builtin" ? `#t/${slug}` : `#m/${source.ext.id}/${slug}`) + tweaks);
+  renderInspector(d);
 }
 
 function renderVariants(ext: MarketTheme, x: Extracted, active: string) {
@@ -166,6 +205,8 @@ function renderVariants(ext: MarketTheme, x: Extracted, active: string) {
 
 async function selectMarket(ext: MarketTheme, x: Extracted, slug?: string) {
   const theme = (slug && x.themes.find((t) => slugify(t.name) === slug)) ?? x.themes[0]!;
+  if (selected?.theme !== theme) overrides = pendingOverrides ?? {};
+  pendingOverrides = null;
   selected = { theme, source: { kind: "market", ext, slug: slugify(theme.name) } };
   renderVariants(ext, x, slugify(theme.name));
   markActive(`m:${ext.id}`);
@@ -197,6 +238,8 @@ async function pickBuiltin(entry: CatalogEntry) {
   }
   try {
     const theme = await p;
+    if (selected?.theme !== theme) overrides = pendingOverrides ?? {};
+    pendingOverrides = null;
     selected = { theme, source: { kind: "builtin", slug: entry.slug } };
     setStatus("");
     await paint();
@@ -213,7 +256,10 @@ let page = 1, lastQuery = "", searching = 0;
 
 function renderResults(list: MarketTheme[], append: boolean) {
   const ul = $("#results");
-  const html = list.map((e) => `<li><button class="row" data-key="m:${esc(e.id)}" title="${esc(e.description)}"><span class="name">${esc(e.displayName)}</span><span class="sub">${esc(e.publisher)} · ${fmtInstalls(e.installs)}</span></button></li>`).join("");
+  const sw = (e: MarketTheme) => e.icon
+    ? `<i class="sw ico"><img src="${esc(e.icon)}" alt="" loading="lazy" onerror="this.parentElement.replaceChildren(this.parentElement.dataset.l)"><\/i>`.replace("<\/i>", "</i>").replace('<i class="sw ico">', `<i class="sw ico" data-l="${esc(e.displayName[0] ?? "?")}">`)
+    : `<i class="sw ico" data-l="">${esc(e.displayName[0] ?? "?")}</i>`;
+  const html = list.map((e) => `<li><button class="row" data-key="m:${esc(e.id)}" title="${esc(e.description)}">${sw(e)}<span class="name">${esc(e.displayName)}</span><span class="sub">${esc(e.publisher)} · ${fmtInstalls(e.installs)}</span></button></li>`).join("");
   if (append) ul.insertAdjacentHTML("beforeend", html); else ul.innerHTML = html;
   ul.querySelectorAll<HTMLButtonElement>("button.row").forEach((b) => {
     const id = b.dataset.key!.slice(2);
@@ -228,7 +274,9 @@ async function search(query: string, append = false) {
   if (!append) { page = 1; lastQuery = query; }
   $("#results").classList.add("busy");
   try {
-    const sortBy = SORT[$<HTMLSelectElement>("#sort").value] ?? 4;
+    // text queries always rank by installs — the well-known theme should be hit #1
+    // (Marketplace "relevance" buries it); the dropdown governs browsing.
+    const sortBy = query.trim() ? SORT.installs! : SORT[$<HTMLSelectElement>("#sort").value] ?? 4;
     const res = await searchThemes(query, { pageSize: 20, pageNumber: page, sortBy });
     if (my !== searching) return;
     lastResults = append ? [...lastResults, ...res] : res;
@@ -271,7 +319,9 @@ async function lucky(attempts = 3): Promise<void> {
 
 // ── boot ───────────────────────────────────────────────────────────────────
 async function fromHash(): Promise<boolean> {
-  const h = decodeURIComponent(location.hash.slice(1));
+  let h = decodeURIComponent(location.hash.slice(1));
+  const tw = /~([A-Za-z0-9_-]+)$/.exec(h);
+  if (tw) { try { pendingOverrides = b64d(tw[1]!); } catch { pendingOverrides = null; } h = h.slice(0, tw.index); }
   const t = /^t\/([a-z0-9-]+)$/.exec(h);
   if (t) { const e = CATALOG.find((x) => x.slug === t[1]); if (e) { await pickBuiltin(e); return true; } }
   const m = /^m\/([^/]+)\/([a-z0-9-]+)$/.exec(h);
@@ -310,6 +360,19 @@ async function main() {
     try { await navigator.clipboard.writeText($("#cmd").textContent ?? ""); $("#copy").textContent = "copied"; setTimeout(() => ($("#copy").textContent = "copy"), 1200); }
     catch { setStatus("clipboard blocked — select the command and copy it", "error"); }
   };
+  $("#insp-reset").onclick = () => { overrides = {}; paint(); };
+  $("#insp-share").onclick = async () => {
+    try { await navigator.clipboard.writeText(location.href); $("#insp-share").textContent = "copied"; setTimeout(() => ($("#insp-share").textContent = "copy share link"), 1200); }
+    catch { setStatus("clipboard blocked — copy the address bar URL", "error"); }
+  };
+  $("#insp-dl").onclick = () => {
+    const slug = selected!.source.slug;
+    const t = effectiveTheme();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([canonicalTheme({ ...t, name: `${t.name} (tweaked)` })], { type: "application/json" }));
+    a.download = `${slug}-tweaked.json`;
+    a.click(); URL.revokeObjectURL(a.href);
+  };
   window.addEventListener("hashchange", () => { fromHash(); });
   // first paint: the URL's theme, else the shipped default (embedded — no network)
   if (!(await fromHash())) await pickBuiltin(CATALOG.find((e) => e.slug === DEFAULT_THEME.slug)!);
@@ -319,4 +382,4 @@ async function main() {
 main().catch((e) => setStatus(`failed to start: ${(e as Error).message}`, "error"));
 
 // exposed for the screenshot harness (tools/site/verify) — not a public API
-(window as any).__mt = { lucky, pickBuiltin: (slug: string) => pickBuiltin(CATALOG.find((e) => e.slug === slug)!), pickMarketId: async (id: string) => { const [pub, name] = id.split("."); const hits = await searchThemes(`${pub} ${name}`, { pageSize: 25 }); const ext = hits.find((x) => x.id.toLowerCase() === id.toLowerCase()); if (!ext) throw new Error("not found"); await pickMarket(ext); }, search, state: () => ({ selected: selected && { name: selected.theme.name, type: selected.theme.type, source: selected.source.kind }, results: lastResults.length }) };
+(window as any).__mt = { tweak, overrides: () => ({ ...overrides }), lucky, pickBuiltin: (slug: string) => pickBuiltin(CATALOG.find((e) => e.slug === slug)!), pickMarketId: async (id: string) => { const [pub, name] = id.split("."); const hits = await searchThemes(`${pub} ${name}`, { pageSize: 25 }); const ext = hits.find((x) => x.id.toLowerCase() === id.toLowerCase()); if (!ext) throw new Error("not found"); await pickMarket(ext); }, search, state: () => ({ selected: selected && { name: selected.theme.name, type: selected.theme.type, source: selected.source.kind }, results: lastResults.length }) };

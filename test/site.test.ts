@@ -7,7 +7,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { deflateRawSync, inflateRawSync } from "node:zlib";
 import { readCentralDirectory, extractEntry, readTextEntry } from "../tools/site/zip.ts";
-import { desktopVars, invalidVars } from "../tools/site/palette.ts";
+import { desktopVars, invalidVars, shellVars, invalidShellVars, ROLE_SPECS } from "../tools/site/palette.ts";
 import { loadTheme } from "../src/load.ts";
 import { createHighlighterCore } from "shiki/core";
 import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
@@ -57,11 +57,30 @@ test("desktop palette: every shipped theme yields solid hex for every var, both 
     for (const flavor of ["vscode", "zed"] as const) {
       const d = desktopVars(t, flavor);
       expect(invalidVars(d.vars), `${f} (${flavor})`).toEqual([]);
+      expect(invalidShellVars(shellVars(d.p)), `${f} shell`).toEqual([]);
       // the herdr window and the bar must come from the same palette the adapter emits
       expect(d.vars["--term-bg"]).toBe(d.herdr.panel_bg!);
       expect(d.vars["--pill-focused-bg"]).toBe(d.herdr.accent!);
       expect(d.vars["--term-tab-active-bg"]).toBe(d.vars["--pill-focused-bg"]);
     }
+  }
+});
+
+test("ROLE_SPECS: overriding each spec's key overrides its projection role, for every shipped theme", () => {
+  const { project } = require("../src/project.ts");
+  const files = readdirSync(THEMES).filter((f) => f.endsWith(".json"));
+  for (const f of files) {
+    const t = loadTheme(join(THEMES, f));
+    for (const spec of ROLE_SPECS) {
+      const tweaked = { ...t, colors: { ...t.colors, [spec.key]: "#123456" } };
+      expect(spec.get(project(tweaked)), `${f}: ${spec.role} via ${spec.key}`).toBe("#123456");
+    }
+    // ANSI honours terminal.ansi* only when all 16 exist — the inspector seeds
+    // the derived palette into every key before overriding one (same as here).
+    const { ANSI_KEYS } = require("../src/project.ts");
+    const seeded = Object.fromEntries(ANSI_KEYS.map((k: string, i: number) => [k, project(t).ansi[i]]));
+    const ansiTweak = { ...t, colors: { ...t.colors, ...seeded, "terminal.ansiRed": "#654321" } };
+    expect(project(ansiTweak).ansi[1]).toBe("#654321");
   }
 });
 

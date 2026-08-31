@@ -10,6 +10,8 @@ export interface MarketTheme {
   displayName: string;
   description: string;
   installs: number;
+  /** small icon URL from the gallery response (may be absent). */
+  icon?: string;
 }
 
 /** Search the Marketplace for theme extensions matching a query, most-installed first. */
@@ -52,6 +54,7 @@ export async function searchThemes(query: string, opts: { pageSize?: number; pag
     displayName: e.displayName,
     description: e.shortDescription ?? "",
     installs: Number(e.statistics?.find((s: any) => s.statisticName === "install")?.value ?? 0),
+    icon: (e.versions?.[0]?.files ?? []).find((f: any) => /Icons\.(Small|Default)$/.test(f.assetType))?.source,
   }));
 }
 

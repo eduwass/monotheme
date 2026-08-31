@@ -69,6 +69,33 @@ export function editorVars(theme: VscodeTheme, p: Projection, flavor: Flavor): V
   };
 }
 
+/** The tweakable roles: each names the VS Code key that WINS its pick chain in
+ *  project(), so writing that key into theme.colors overrides the role for the
+ *  whole pipeline (editor, herdr block, pills, ring). Tested in test/site.test.ts
+ *  so this table can't drift from project() silently. */
+export interface RoleSpec { role: string; key: string; get: (p: Projection) => string; note: string }
+export const ROLE_SPECS: RoleSpec[] = [
+  { role: "background",  key: "editor.background",                        get: (p) => p.bg,          note: "editor · herdr panel_bg · terminal bg" },
+  { role: "panel",       key: "sideBar.background",                       get: (p) => p.bgPanel,     note: "sidebars · tab strips · status bars · herdr surface_dim" },
+  { role: "foreground",  key: "editor.foreground",                        get: (p) => p.fg,          note: "text everywhere · herdr text · surface ladder" },
+  { role: "muted",       key: "descriptionForeground",                    get: (p) => p.fgMuted,     note: "line numbers · inactive tabs · secondary text" },
+  { role: "accent",      key: "button.background",                        get: (p) => p.accent,      note: "window ring · focused pill · active tab · herdr accent" },
+  { role: "border",      key: "editorGroup.border",                       get: (p) => p.border,      note: "pane splits · widget borders" },
+  { role: "selection",   key: "editor.selectionBackground",               get: (p) => p.selection,   note: "text selection wash" },
+  { role: "list select", key: "list.activeSelectionBackground",           get: (p) => p.listSelected, note: "file-tree selected row" },
+  { role: "cursor",      key: "editorCursor.foreground",                  get: (p) => p.cursor,      note: "caret" },
+  { role: "success",     key: "editorGutter.addedBackground",             get: (p) => p.success,     note: "git added · agent done dot" },
+  { role: "error",       key: "editorError.foreground",                   get: (p) => p.error,       note: "errors · git deleted · blocked dot" },
+  { role: "warning",     key: "editorWarning.foreground",                 get: (p) => p.warning,     note: "warnings · working dot" },
+];
+export const ANSI_NAMES = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white",
+  "bright black", "bright red", "bright green", "bright yellow", "bright blue", "bright magenta", "bright cyan", "bright white"];
+
+/** The portable theme JSON — same shape the CLI vendors and `theme set <file>` accepts. */
+export function canonicalTheme(theme: VscodeTheme): string {
+  return JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors }, null, 2) + "\n";
+}
+
 export interface Desktop { p: Projection; herdr: Vars; vars: Vars }
 
 /** Everything the desktop mock needs for one theme, as CSS custom properties. */
