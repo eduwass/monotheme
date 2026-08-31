@@ -115,7 +115,8 @@
   .mkt-card i img { width:100%; height:100%; object-fit:cover; }
   .mkt-card span { font-size:13px; font-weight:600; line-height:1.25; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
   .mkt-card small { font-size:11px; color:var(--muted); }
-  .mkt-note { color:var(--muted); font-size:13px; min-height:20px; margin:4px 0 0; }
+  .mkt-actions { display:flex; gap:12px; margin-top:14px; }
+  .mkt-note { color:var(--muted); font-size:13px; min-height:20px; margin:10px 0 0; }
   .mkt-note b { color:var(--fg); }
   html { transition:background-color .25s; } body, .card, .mkt-card, pre.code, .video-card { transition:background-color .25s, border-color .25s; }
 
@@ -156,6 +157,10 @@
   <h2 style="font-size:22px">Fresh from the VS Code Marketplace</h2>
   <p class="lead" style="margin-bottom:18px">The most-installed themes right now — click one to preview it across a whole desktop: editor, terminal, status bar and window accents, extracted from the real extension in your browser.</p>
   <div class="mkt-strip" id="mkt-strip"></div>
+  <div class="mkt-actions">
+    <a class="btn ghost" id="mkt-dice" href="./browse.html" title="a random theme from the whole Marketplace">🎲 Surprise me</a>
+    <a class="btn ghost" href="./browse.html">Browse all themes</a>
+  </div>
   <p class="mkt-note" id="mkt-note">loading the Marketplace…</p>
 </section>
 

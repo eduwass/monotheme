@@ -16,22 +16,22 @@ function card(e: MarketTheme): string {
 async function load() {
   try {
     const hits = (await searchThemes("", { pageSize: 20, sortBy: SORT.installs! })).slice(0, 10);
-    strip.innerHTML = hits.map(card).join("") +
-      `<a class="mkt-card dice" id="mkt-dice" href="./browse.html" title="a random theme from the whole Marketplace"><i>🎲</i><span>surprise me</span><small>random pick</small></a>`;
+    strip.innerHTML = hits.map(card).join("");
     note.textContent = "";
-    // the dice resolves its random pick on click, then follows the link
-    document.getElementById("mkt-dice")!.addEventListener("click", async (ev) => {
-      ev.preventDefault();
-      note.textContent = "rolling…";
-      try {
-        const page = 1 + Math.floor(Math.random() * 40);
-        const rand = await searchThemes("", { pageSize: 20, pageNumber: page, sortBy: SORT.installs! });
-        const pick = rand[Math.floor(Math.random() * rand.length)];
-        if (pick) location.href = `./browse.html#m/${pick.id}`;
-      } catch { note.textContent = "the dice failed — try again"; }
-    });
   } catch { note.textContent = "Marketplace unreachable right now — the strip will be back."; }
 }
 load();
+// the dice sits under the strip; it resolves a random Marketplace theme on
+// click, then follows the same browse deep link the cards use
+document.getElementById("mkt-dice")!.addEventListener("click", async (ev) => {
+  ev.preventDefault();
+  note.textContent = "rolling…";
+  try {
+    const page = 1 + Math.floor(Math.random() * 40);
+    const rand = await searchThemes("", { pageSize: 20, pageNumber: page, sortBy: SORT.installs! });
+    const pick = rand[Math.floor(Math.random() * rand.length)];
+    if (pick) location.href = `./browse.html#m/${pick.id}`;
+  } catch { note.textContent = "the dice failed — try again"; }
+});
 // exposed for the screenshot harness — not a public API
 (window as any).__home = { count: () => strip.querySelectorAll("a[href*='#m/']").length };
