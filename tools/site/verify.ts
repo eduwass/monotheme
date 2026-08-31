@@ -48,10 +48,6 @@ await waitFor(`__mt.state().selected?.name === 'Tokyo Night Light'`);
 await sleep(300); await shot("2-light-builtin");
 console.log("hash:", await evalJs("location.hash"));
 
-// zed flavor
-await evalJs(`document.querySelector('input[name=flavor][value=zed]').click()`); await sleep(400); await shot("3-zed");
-await evalJs(`document.querySelector('input[name=flavor][value=vscode]').click()`);
-
 // focus the herdr window (accent border moves)
 await evalJs(`document.querySelector('#win-herdr').dispatchEvent(new MouseEvent('mousedown', {bubbles:true}))`); await sleep(200);
 console.log("focused window:", await evalJs("document.querySelector('.win.focused').id"));

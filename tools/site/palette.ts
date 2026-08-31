@@ -4,6 +4,7 @@
 // chrome reads the VS Code keys the editor itself reads (falling back to the
 // projection exactly like the zed adapter does).
 import { project, type Projection } from "../../src/project.ts";
+import { contrastRatio } from "../../src/contrast.ts";
 import { flattenAlpha, mix, type VscodeTheme } from "../../src/load.ts";
 import { toHerdrTheme } from "../../src/targets/herdr.ts";
 
@@ -83,8 +84,23 @@ export function desktopVars(theme: VscodeTheme, flavor: Flavor = "vscode"): Desk
   return { p, herdr: h, vars };
 }
 
+/** Re-skin the page shell itself with the selected theme — same tokens the
+ *  landing page uses, derived from the projection. Ink on accent is picked by
+ *  contrast so chips/buttons stay readable on light or dark accents. */
+export function shellVars(p: Projection): Vars {
+  const ink = contrastRatio("#111111", p.accent) >= contrastRatio("#ffffff", p.accent) ? "#111111" : "#ffffff";
+  return {
+    "--bg": p.bg, "--bg2": p.bgPanel, "--panel": mix(p.bg, p.fg, 0.06), "--line": mix(p.bg, p.fg, 0.14),
+    "--fg": p.fg, "--muted": p.fgMuted, "--theme-accent": p.accent, "--accent": p.accent, "--accent-ink": ink,
+  };
+}
+
 const HEX = /^#[0-9a-f]{6}$/i;
 /** Every var must be a solid hex (the mock paints with them directly). */
 export function invalidVars(vars: Vars): string[] {
   return Object.entries(vars).filter(([k, v]) => !k.startsWith("--wall") && k !== "--win-shadow" && !HEX.test(v)).map(([k, v]) => `${k}=${v}`);
+}
+
+export function invalidShellVars(vars: Vars): string[] {
+  return Object.entries(vars).filter(([, v]) => !HEX.test(v)).map(([k, v]) => `${k}=${v}`);
 }

@@ -9,7 +9,7 @@ import tsLang from "shiki/langs/typescript.mjs";
 import type { VscodeTheme } from "../../src/load.ts";
 import { searchThemes, SORT, type MarketTheme } from "../../src/market-search.ts";
 import { slugify } from "../../src/slug.ts";
-import { desktopVars, type Flavor } from "./palette.ts";
+import { desktopVars, shellVars, type Flavor } from "./palette.ts";
 import { readCentralDirectory, readTextEntry, inflateRawWeb } from "./zip.ts";
 import { CATALOG, DEFAULT_THEME, THEMES_BASE, type CatalogEntry } from "./catalog.gen.ts";
 
@@ -133,7 +133,11 @@ async function paint() {
   const desk = $("#desktop");
   for (const [k, v] of Object.entries(d.vars)) desk.style.setProperty(k, v);
   desk.dataset.type = theme.type;
-  document.documentElement.style.setProperty("--theme-accent", d.p.accent);
+  // the page shell wears the theme too
+  const root = document.documentElement;
+  for (const [k, v] of Object.entries(shellVars(d.p))) root.style.setProperty(k, v);
+  root.style.colorScheme = theme.type;
+  root.dataset.type = theme.type;
   $("#code").innerHTML = await highlight(theme);
   // meta + command
   const slug = source.kind === "builtin" ? source.slug : source.slug;
@@ -152,8 +156,7 @@ async function paint() {
 
 function renderVariants(ext: MarketTheme, x: Extracted, active: string) {
   const el = $("#variants");
-  if (x.themes.length < 2) { el.hidden = true; el.innerHTML = ""; return; }
-  el.hidden = false;
+  if (x.themes.length < 2) { el.innerHTML = ""; return; }
   el.innerHTML = `<span class="lbl">${esc(x.label)} ships ${x.themes.length} variants</span>` +
     x.themes.map((t) => `<button class="chip${slugify(t.name) === active ? " on" : ""}" data-slug="${esc(slugify(t.name))}" data-type="${t.type}">${esc(t.name)}</button>`).join("");
   el.querySelectorAll<HTMLButtonElement>(".chip").forEach((b) => b.onclick = () => selectMarket(ext, x, b.dataset.slug!));
@@ -182,7 +185,7 @@ async function pickMarket(ext: MarketTheme, slug?: string) {
 const builtinCache = new Map<string, Promise<VscodeTheme>>();
 async function pickBuiltin(entry: CatalogEntry) {
   markActive(`t:${entry.slug}`);
-  $("#variants").hidden = true;
+  $("#variants").innerHTML = "";
   let p = builtinCache.get(entry.slug);
   if (!p) {
     p = entry.slug === DEFAULT_THEME.slug
@@ -271,7 +274,6 @@ async function main() {
   q.oninput = () => { clearTimeout(timer); timer = window.setTimeout(() => search(q.value), 300); };
   $<HTMLSelectElement>("#sort").onchange = () => search(q.value);
   $("#more").onclick = () => { page++; search(lastQuery, true); };
-  document.querySelectorAll<HTMLInputElement>("input[name=flavor]").forEach((r) => r.onchange = () => { flavor = r.value as Flavor; paint(); });
   for (const w of ["editor", "herdr"] as const) $(`#win-${w}`).onmousedown = () => { focused = w; document.querySelectorAll(".win").forEach((x) => x.classList.toggle("focused", x.id === `win-${w}`)); };
   $("#copy").onclick = async () => {
     try { await navigator.clipboard.writeText($("#cmd").textContent ?? ""); $("#copy").textContent = "copied"; setTimeout(() => ($("#copy").textContent = "copy"), 1200); }
