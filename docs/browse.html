@@ -48,6 +48,9 @@
   .side input:focus { border-color:var(--theme-accent); }
   .side select { padding:6px 8px; border-radius:var(--r-md); border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:12px; }
   .side .hint { font-size:12px; color:var(--muted); align-self:center; }
+  .side .explore { grid-column:1 / -1; display:flex; flex-wrap:wrap; gap:6px; }
+  .side .explore .chip { font-size:12px; padding:3px 9px; }
+  #lucky { border-color:var(--theme-accent); color:var(--fg); }
   .side h2 { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600; margin:0; padding:12px 16px 4px; }
   .lists { overflow:auto; flex:1; padding-bottom:16px; }
   .side ul { list-style:none; margin:0; padding:0 8px; }
@@ -189,6 +192,16 @@
       <input id="q" type="search" placeholder="Search the VS Code Marketplace…" autocomplete="off" spellcheck="false">
       <span class="hint">sort</span>
       <select id="sort"><option value="installs">most installed</option><option value="trending">trending</option><option value="relevance">relevance</option><option value="recent">recently updated</option></select>
+      <div class="explore">
+        <button class="chip" id="lucky" title="pick a random theme from the Marketplace">🎲 surprise me</button>
+        <button class="chip" data-explore="sort:trending">trending</button>
+        <button class="chip" data-explore="sort:recent">new</button>
+        <button class="chip" data-explore="q:light">light</button>
+        <button class="chip" data-explore="q:minimal">minimal</button>
+        <button class="chip" data-explore="q:pastel">pastel</button>
+        <button class="chip" data-explore="q:retro">retro</button>
+        <button class="chip" data-explore="q:high contrast">contrast</button>
+      </div>
     </div>
     <div class="lists">
       <h2>Marketplace</h2>

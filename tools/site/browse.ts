@@ -151,7 +151,9 @@ async function paint() {
   if (source.kind === "market") $<HTMLAnchorElement>("#open-market").href = `https://marketplace.visualstudio.com/items?itemName=${source.ext.id}`;
   const swatches = $("#swatches");
   swatches.innerHTML = d.p.ansi.map((c, i) => `<i title="ansi ${i}" style="background:${c}"></i>`).join("");
-  location.hash = source.kind === "builtin" ? `t/${slug}` : `m/${source.ext.id}/${slug}`;
+  // replaceState, not location.hash: assigning the hash fires hashchange and
+  // would re-run the (network) hash router after every local selection.
+  history.replaceState(null, "", source.kind === "builtin" ? `#t/${slug}` : `#m/${source.ext.id}/${slug}`);
 }
 
 function renderVariants(ext: MarketTheme, x: Extracted, active: string) {
@@ -245,6 +247,28 @@ function renderCatalog() {
   });
 }
 
+// ── discover ───────────────────────────────────────────────────────────────
+// Random theme: a random page of the Marketplace's theme category, a random
+// extension off it, a random variant out of that. Retries past extensions that
+// fail to extract (tmTheme-only, huge, corrupt).
+async function lucky(attempts = 3): Promise<void> {
+  setStatus("rolling the dice…", "info");
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const page = 1 + Math.floor(Math.random() * 40);
+      const hits = await searchThemes("", { pageSize: 20, pageNumber: page, sortBy: SORT.installs! });
+      const ext = hits[Math.floor(Math.random() * hits.length)];
+      if (!ext) continue;
+      const x = await loadExtension(ext);
+      const theme = x.themes[Math.floor(Math.random() * x.themes.length)]!;
+      await selectMarket(ext, x, slugify(theme.name));
+      setStatus("");
+      return;
+    } catch { /* roll again */ }
+  }
+  setStatus("the dice failed three times — try again", "error");
+}
+
 // ── boot ───────────────────────────────────────────────────────────────────
 async function fromHash(): Promise<boolean> {
   const h = decodeURIComponent(location.hash.slice(1));
@@ -273,6 +297,13 @@ async function main() {
   let timer = 0;
   q.oninput = () => { clearTimeout(timer); timer = window.setTimeout(() => search(q.value), 300); };
   $<HTMLSelectElement>("#sort").onchange = () => search(q.value);
+  document.querySelectorAll<HTMLButtonElement>("[data-explore]").forEach((b) => b.onclick = () => {
+    const [kind, val] = b.dataset.explore!.split(/:(.*)/s) as [string, string];
+    if (kind === "sort") { $<HTMLSelectElement>("#sort").value = val; q.value = ""; }
+    else { q.value = val; }
+    search(q.value);
+  });
+  $("#lucky").onclick = () => lucky();
   $("#more").onclick = () => { page++; search(lastQuery, true); };
   for (const w of ["editor", "herdr"] as const) $(`#win-${w}`).onmousedown = () => { focused = w; document.querySelectorAll(".win").forEach((x) => x.classList.toggle("focused", x.id === `win-${w}`)); };
   $("#copy").onclick = async () => {
@@ -288,4 +319,4 @@ async function main() {
 main().catch((e) => setStatus(`failed to start: ${(e as Error).message}`, "error"));
 
 // exposed for the screenshot harness (tools/site/verify) — not a public API
-(window as any).__mt = { pickBuiltin: (slug: string) => pickBuiltin(CATALOG.find((e) => e.slug === slug)!), pickMarketId: async (id: string) => { const [pub, name] = id.split("."); const hits = await searchThemes(`${pub} ${name}`, { pageSize: 25 }); const ext = hits.find((x) => x.id.toLowerCase() === id.toLowerCase()); if (!ext) throw new Error("not found"); await pickMarket(ext); }, search, state: () => ({ selected: selected && { name: selected.theme.name, type: selected.theme.type, source: selected.source.kind }, results: lastResults.length }) };
+(window as any).__mt = { lucky, pickBuiltin: (slug: string) => pickBuiltin(CATALOG.find((e) => e.slug === slug)!), pickMarketId: async (id: string) => { const [pub, name] = id.split("."); const hits = await searchThemes(`${pub} ${name}`, { pageSize: 25 }); const ext = hits.find((x) => x.id.toLowerCase() === id.toLowerCase()); if (!ext) throw new Error("not found"); await pickMarket(ext); }, search, state: () => ({ selected: selected && { name: selected.theme.name, type: selected.theme.type, source: selected.source.kind }, results: lastResults.length }) };
