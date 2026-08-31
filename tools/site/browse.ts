@@ -129,7 +129,10 @@ function tweak(key: string, value: string) {
     for (let i = 0; i < 16; i++) overrides[ANSI_KEYS[i]!] ??= cur[i]!;
   }
   overrides[key] = value;
-  paint();
+  // live drag: repaint the desktop but DON'T rebuild the inspector — replacing
+  // the <input> mid-drag closes the native color picker. The full inspector
+  // refresh happens on 'change' (picker closed) or when the selection changes.
+  paint(false);
 }
 const b64e = (o: object) => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(o)))).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
 const b64d = (t: string) => JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t.replaceAll("-", "+").replaceAll("_", "/")), (c) => c.charCodeAt(0))));
@@ -142,7 +145,11 @@ function renderInspector(d: ReturnType<typeof desktopVars>) {
   document.querySelectorAll<HTMLInputElement>(".insp-row input").forEach((inp) => {
     let raf = 0;
     inp.oninput = () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => tweak(inp.dataset.key!, inp.value)); };
+    inp.onchange = () => paint(); // picker closed — refresh dependent swatches
   });
+  syncInspectorButtons();
+}
+function syncInspectorButtons() {
   for (const b of ["insp-reset", "insp-share", "insp-dl"]) ($(`#${b}`) as HTMLButtonElement).disabled = !dirty();
 }
 
@@ -160,7 +167,7 @@ function setStatus(msg: string, kind: "info" | "error" | "" = "") {
   const el = $("#status"); el.textContent = msg; el.className = "status " + kind; el.hidden = !msg;
 }
 
-async function paint() {
+async function paint(rebuildInspector = true) {
   if (!selected) return;
   const { source } = selected;
   const theme = effectiveTheme();
@@ -192,7 +199,7 @@ async function paint() {
   // would re-run the (network) hash router after every local selection.
   const tweaks = dirty() ? `~${b64e(overrides)}` : "";
   history.replaceState(null, "", (source.kind === "builtin" ? `#t/${slug}` : `#m/${source.ext.id}/${slug}`) + tweaks);
-  renderInspector(d);
+  if (rebuildInspector) renderInspector(d); else syncInspectorButtons();
 }
 
 function renderVariants(ext: MarketTheme, x: Extracted, active: string) {
