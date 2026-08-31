@@ -7,3 +7,4 @@ node_modules/
 dist/
 src/embedded-themes.gen.ts
 src/targets.gen.ts
+tools/site/catalog.gen.ts

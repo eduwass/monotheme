@@ -104,7 +104,9 @@ export function defineTarget(t: Target): Target {
   return t;
 }
 
-const HOME = homedir();
+// lazy: this module is also bundled for the browser (docs/browse.js), where
+// there is no home directory to resolve at import time.
+const home = () => homedir();
 const osOf = (): OS => (process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux");
 
 /** Build the context for one theme application. `run` commands (reload signals)
@@ -114,16 +116,16 @@ const osOf = (): OS => (process.platform === "darwin" ? "mac" : process.platform
  *  swallowed anyway — see scripts/bench-set.ts. */
 export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, fonts: FontsConfig | null = null, slot = "monotheme"): Ctx {
   const os = osOf();
-  const cfgRoot = process.env.XDG_CONFIG_HOME || (os === "win" ? process.env.APPDATA || join(HOME, "AppData", "Roaming") : join(HOME, ".config"));
-  const dataRoot = process.env.XDG_DATA_HOME || (os === "win" ? process.env.LOCALAPPDATA || join(HOME, "AppData", "Local") : join(HOME, ".local", "share"));
-  const appSupportRoot = os === "mac" ? join(HOME, "Library", "Application Support") : cfgRoot;
+  const cfgRoot = process.env.XDG_CONFIG_HOME || (os === "win" ? process.env.APPDATA || join(home(), "AppData", "Roaming") : join(home(), ".config"));
+  const dataRoot = process.env.XDG_DATA_HOME || (os === "win" ? process.env.LOCALAPPDATA || join(home(), "AppData", "Local") : join(home(), ".local", "share"));
+  const appSupportRoot = os === "mac" ? join(home(), "Library", "Application Support") : cfgRoot;
   return {
     os, mac: os === "mac", linux: os === "linux", win: os === "win",
     theme, palette, slot, entry,
     config: (...p) => join(cfgRoot, ...p),
     appSupport: (...p) => join(appSupportRoot, ...p),
     data: (...p) => join(dataRoot, ...p),
-    home: (...p) => join(HOME, ...p),
+    home: (...p) => join(home(), ...p),
     has: (path) => existsSync(path),
     hasCmd: (cmd) =>
       typeof Bun !== "undefined"
@@ -160,7 +162,7 @@ export function applyTarget(t: Target, c: Ctx): TargetResult {
     const path = t.file!(c);
     c.write(path, t.render!(c));
     if (t.reload) c.run(t.reload(c));
-    return { name: t.name, present: true, ok: true, status: `${t.name} → ${path.replace(HOME, "~")}` };
+    return { name: t.name, present: true, ok: true, status: `${t.name} → ${path.replace(home(), "~")}` };
   } catch (e) {
     return { name: t.name, present: true, ok: false, status: `${t.name} (error: ${(e as Error).message})` };
   }

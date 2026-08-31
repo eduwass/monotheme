@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>monotheme — browse themes</title>
+<meta name="description" content="Browse VS Code Marketplace themes and preview them across your whole desktop — editor, herdr terminal, window accents and status bar — before applying with monotheme.">
+<meta property="og:title" content="monotheme — browse themes">
+<meta property="og:description" content="Preview any VS Code theme across your editor, terminal, window accents and status bar. One command applies it everywhere.">
+<meta property="og:image" content="https://repository-images.githubusercontent.com/1278772005/e4f33a83-2636-48d7-a5c8-21402c257134">
+<link rel="icon" href="https://raw.githubusercontent.com/eduwass/monotheme/main/assets/monotheme-logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&family=JetBrains+Mono:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#1b1a3a; --bg2:#232150; --panel:#2d2b55; --line:#3a3568;
+    --fg:#ffffff; --muted:#a599e9; --accent:#fad000; --theme-accent:#fad000;
+    --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  * { box-sizing:border-box; }
+  html { color-scheme:dark; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:'Inter',system-ui,sans-serif; line-height:1.5; min-height:100vh; }
+  a { color:var(--accent); text-decoration:none; }
+  button { font:inherit; color:inherit; background:none; border:0; cursor:pointer; }
+  code, pre, .mono { font-family:var(--mono); }
+  [hidden] { display:none !important; }
+
+  /* ── top bar ── */
+  .top { display:flex; align-items:center; gap:18px; padding:14px 24px; border-bottom:1px solid var(--line); background:var(--bg2); }
+  .top .brand { display:flex; align-items:center; gap:10px; font-weight:800; font-size:18px; color:var(--fg); }
+  .top .brand img { width:26px; height:26px; border-radius:6px; }
+  .top .brand span { color:var(--muted); font-weight:500; }
+  .top nav { margin-left:auto; display:flex; gap:18px; font-size:14px; }
+  .top nav a { color:var(--muted); } .top nav a:hover { color:var(--fg); }
+
+  /* ── layout ── */
+  .app { display:grid; grid-template-columns:320px minmax(0,1fr); min-height:calc(100vh - 57px); }
+  @media (max-width:900px){ .app { grid-template-columns:1fr; } .side { position:static; border-right:0; border-bottom:1px solid var(--line); max-height:none; } .lists { max-height:34vh; } .main { padding:16px; } }
+  .side { border-right:1px solid var(--line); background:var(--bg2); display:flex; flex-direction:column; max-height:calc(100vh - 57px); position:sticky; top:0; }
+  .side .search { padding:14px 16px 10px; display:grid; gap:8px; grid-template-columns:1fr auto; }
+  .side input { grid-column:1 / -1; width:100%; padding:10px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--fg); font-size:14px; outline:none; }
+  .side input:focus { border-color:var(--theme-accent); }
+  .side select { padding:6px 8px; border-radius:6px; border:1px solid var(--line); background:var(--bg); color:var(--muted); font-size:12px; }
+  .side .hint { font-size:12px; color:var(--muted); align-self:center; }
+  .side h2 { font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin:0; padding:10px 16px 4px; }
+  .lists { overflow:auto; flex:1; padding-bottom:16px; }
+  .side ul { list-style:none; margin:0; padding:0 8px; }
+  .side ul.busy { opacity:.5; }
+  .row { display:grid; grid-template-columns:auto 1fr; grid-template-areas:"sw name" "sw sub"; column-gap:10px; width:100%; text-align:left; padding:8px 10px; border-radius:8px; line-height:1.25; }
+  .row:hover { background:var(--panel); }
+  .row.on { background:var(--panel); box-shadow:inset 3px 0 0 var(--theme-accent); }
+  .row .name { grid-area:name; font-weight:600; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .row .sub { grid-area:sub; font-size:12px; color:var(--muted); }
+  .row .sw { grid-area:sw; width:22px; height:22px; border-radius:6px; border:2px solid; align-self:center; position:relative; overflow:hidden; }
+  .row .sw b { position:absolute; right:0; bottom:0; width:10px; height:10px; border-radius:6px 0 0 0; }
+  .row:not(:has(.sw)) { grid-template-columns:1fr; grid-template-areas:"name" "sub"; }
+  #more { margin:8px 16px 0; padding:8px; width:calc(100% - 32px); border:1px dashed var(--line); border-radius:8px; color:var(--muted); font-size:13px; }
+  #more:hover { color:var(--fg); border-color:var(--muted); }
+  #results-empty { padding:6px 18px 10px; color:var(--muted); font-size:13px; }
+
+  /* ── main ── */
+  .main { padding:22px 28px 40px; display:flex; flex-direction:column; gap:16px; min-width:0; }
+  .head { display:flex; flex-wrap:wrap; align-items:center; gap:10px 18px; }
+  .head h1 { margin:0; font-size:24px; font-weight:800; letter-spacing:-.01em; }
+  .head .tag { font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); text-transform:uppercase; letter-spacing:.08em; }
+  .head .tag[data-type=light] { background:#ffffff14; }
+  .head .src { color:var(--muted); font-size:14px; }
+  #swatches { display:flex; gap:3px; margin-left:auto; } #swatches i { width:14px; height:14px; border-radius:3px; display:block; }
+  .status { padding:8px 12px; border-radius:8px; font-size:13px; background:var(--panel); color:var(--muted); }
+  .status.error { background:#4a1d3a; color:#ffb8d0; }
+  #variants { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  #variants .lbl { color:var(--muted); font-size:13px; margin-right:4px; }
+  .chip { padding:5px 11px; border-radius:999px; border:1px solid var(--line); font-size:13px; color:var(--muted); }
+  .chip:hover { color:var(--fg); border-color:var(--muted); }
+  .chip.on { background:var(--theme-accent); border-color:var(--theme-accent); color:#111; font-weight:600; }
+  .controls { display:flex; flex-wrap:wrap; gap:16px; align-items:center; font-size:13px; color:var(--muted); }
+  .controls label { display:inline-flex; gap:6px; align-items:center; cursor:pointer; }
+  .controls input { accent-color:var(--theme-accent); }
+
+  /* ── desktop mock ── */
+  .desktop { position:relative; aspect-ratio:16 / 9.6; border-radius:14px; overflow:hidden; border:1px solid var(--line);
+    background:radial-gradient(120% 90% at 20% 0%, var(--wall-a) 0%, var(--wall-b) 70%); font-size:clamp(7px, 0.62vw + 3px, 11.5px); container-type:inline-size; }
+  .bar { position:absolute; inset:0 0 auto 0; height:2.6em; display:flex; align-items:center; gap:.5em; padding:0 .9em; background:rgba(30,30,46,.82); color:#cdd6f4; font-family:var(--mono); font-size:.92em; }
+  .bar .pills { display:flex; gap:.35em; }
+  .bar .pill { height:1.7em; min-width:2.2em; padding:0 .7em; border-radius:.9em; display:inline-flex; align-items:center; gap:.4em; font-weight:700; background:var(--pill-empty-bg); color:var(--pill-empty-ink); }
+  .bar .pill.filled { background:var(--pill-filled-bg); color:var(--pill-filled-ink); }
+  .bar .pill.active { background:var(--pill-active-bg); color:var(--pill-active-ink); }
+  .bar .pill.focused { background:var(--pill-focused-bg); color:var(--pill-focused-ink); }
+  .bar .pill i { width:.5em; height:.5em; border-radius:50%; background:var(--pill-ok); } .bar .pill i.down { background:var(--pill-down); }
+  .bar .title { margin:0 auto; opacity:.9; }
+  .bar .title b { color:var(--term-accent); }
+  .bar .clock { opacity:.85; }
+  .win { position:absolute; border-radius:.7em; overflow:hidden; box-shadow:0 1.6em 3em -1em var(--win-shadow), 0 0 0 1px rgba(0,0,0,.35); outline:0 solid transparent; outline-offset:.15em; cursor:default; }
+  .win.focused { z-index:2; outline:.28em solid var(--accent); }
+  .win .tb { height:2.4em; display:flex; align-items:center; gap:.45em; padding:0 .9em; font-size:.95em; }
+  .win .tb .dots { display:flex; gap:.45em; } .win .tb .dots i { width:.85em; height:.85em; border-radius:50%; display:block; background:#ff5f57; } .win .tb .dots i:nth-child(2){ background:#febc2e; } .win .tb .dots i:nth-child(3){ background:#28c840; }
+  .win .tb span { margin:0 auto; opacity:.8; }
+
+  /* editor */
+  #win-editor { right:2.6%; top:4.2em; width:60%; height:66%; background:var(--ed-bg); color:var(--ed-fg); display:grid; grid-template-rows:auto 1fr auto; }
+  #win-editor .tb { background:var(--ed-title-bg); color:var(--ed-title-fg); }
+  #win-editor .body { display:grid; grid-template-columns:2.8em 22% 1fr; min-height:0; }
+  .activity { background:var(--ed-activity-bg); color:var(--ed-activity-dim); display:flex; flex-direction:column; align-items:center; gap:1.1em; padding-top:1em; }
+  .activity i { width:1.3em; height:1.3em; border-radius:.3em; border:.18em solid currentColor; display:block; opacity:.85; position:relative; }
+  .activity i:first-child { color:var(--ed-activity-fg); border-left-width:.35em; }
+  .activity i:nth-child(3)::after { content:"3"; position:absolute; right:-.6em; top:-.6em; background:var(--ed-badge); color:#fff; border-radius:1em; font:700 .6em/1.4 var(--mono); padding:0 .4em; }
+  .sidebar { background:var(--ed-side-bg); color:var(--ed-side-fg); padding:.6em 0; font-size:.95em; overflow:hidden; }
+  .sidebar h4 { margin:0 0 .4em; padding:0 1em; font-size:.75em; letter-spacing:.1em; font-weight:600; opacity:.8; }
+  .sidebar div { padding:.18em 1em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidebar div.d { opacity:.9; } .sidebar div.f { padding-left:2.2em; } .sidebar div.sel { background:var(--ed-side-sel); color:var(--ed-fg); }
+  .editor { display:grid; grid-template-rows:auto 1fr; min-width:0; min-height:0; }
+  .tabs { display:flex; background:var(--ed-tabs-bg); font-size:.92em; }
+  .tabs span { padding:.55em 1.2em; background:var(--ed-tab-inactive-bg); color:var(--ed-tab-inactive-fg); border-right:1px solid var(--ed-border); }
+  .tabs span.on { background:var(--ed-tab-bg); color:var(--ed-tab-fg); box-shadow:inset 0 .18em 0 var(--ed-tab-border); }
+  .codewrap { display:grid; grid-template-columns:auto 1fr; overflow:hidden; padding-top:.5em; background:var(--ed-bg); }
+  .gutter { padding:0 .9em 0 1.1em; color:var(--ed-ln); text-align:right; font-family:var(--mono); font-size:1em; line-height:1.55; }
+  .gutter span { display:block; } .gutter span.on { color:var(--ed-ln-active); }
+  #code pre { margin:0; background:transparent !important; font-family:var(--mono); font-size:1em; line-height:1.55; white-space:pre; overflow:hidden; }
+  #code code { display:block; }
+  #code .line:nth-child(5) { background:var(--ed-line-hl); display:inline-block; width:100%; }
+  .statusbar { height:1.9em; background:var(--ed-status-bg); color:var(--ed-status-fg); display:flex; align-items:center; gap:1.3em; padding:0 1em; font-size:.82em; font-family:var(--mono); }
+  .statusbar .r { margin-left:auto; display:flex; gap:1.3em; }
+
+  /* herdr — same variables herdr.dev's own mock uses */
+  #win-herdr { left:2.6%; bottom:3.5%; width:56%; height:58%; background:var(--term-bg); color:var(--term-muted); font-family:var(--mono); display:grid; grid-template-rows:auto 1fr; }
+  #win-herdr .tb { background:var(--term-sidebar-bg); color:var(--term-muted); }
+  .herdr { display:grid; grid-template-columns:minmax(6em,26%) 1fr; min-height:0; line-height:1.4; }
+  .h-side { background:var(--term-sidebar-bg); border-right:1px solid var(--term-border); display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+  .h-title { padding:.5em .9em; color:var(--term-muted); font-weight:700; display:flex; justify-content:space-between; }
+  .h-agents { border-top:1px solid var(--term-border); }
+  .h-space, .h-agent { display:grid; grid-template-columns:auto 1fr; gap:.55em; padding:.42em .9em; color:var(--term-dim); }
+  .h-space.active, .h-agent.active { background:var(--term-active-bg); }
+  .h-space strong, .h-agent strong { display:block; color:var(--term-text); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .h-space small, .h-agent small { display:block; color:var(--term-muted); font-size:.9em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .h-space.active small { color:var(--accent); }
+  .h-dot { width:.45em; height:.45em; margin-top:.35em; border-radius:50%; background:var(--muted); }
+  .h-dot.working { background:var(--yellow); } .h-dot.blocked { background:var(--red); } .h-dot.done { background:var(--green); }
+  .h-agent > span { color:var(--term-green-bright); } .h-agent.working > span, .h-agent.working small { color:var(--term-str); } .h-agent.blocked > span, .h-agent.blocked small { color:var(--red); } .h-agent.done > span, .h-agent.done small { color:var(--accent); }
+  .h-main { display:grid; grid-template-rows:auto 1fr; min-width:0; min-height:0; }
+  .h-tabs { display:flex; background:var(--term-tab-bg); color:var(--term-muted); }
+  .h-tabs span { min-width:5em; padding:.3em .9em; border-right:1px solid var(--term-border); }
+  .h-tabs span.active { background:var(--term-tab-active-bg); color:var(--term-tab-active-text); font-weight:800; }
+  .h-panes { display:grid; grid-template-columns:1fr 1fr; gap:1ch; min-height:0; }
+  .h-pane { position:relative; padding:1.1em 1.4ch; overflow:hidden; background:var(--term-bg); color:var(--term-text); display:flex; flex-direction:column; }
+  .h-pane::before { content:""; position:absolute; inset:.45em .6ch; border:1px solid var(--term-border); pointer-events:none; }
+  .h-pane.focused::before { border-color:var(--accent); }
+  .h-pane > div { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .h-pane .dim { color:var(--term-dim); } .h-pane b { color:var(--accent); } .h-pane .cmd { color:var(--term-cmd); } .h-pane .str { color:var(--term-str); }
+  .h-pane .blue { color:var(--term-blue); } .h-pane .green { color:var(--term-green-bright); } .h-pane .red { color:var(--term-red); } .h-pane .cc { color:#d97757; }
+  .h-pane .prompt { color:var(--term-prompt); font-weight:700; } .h-pane .prompt em { color:var(--term-dim); font-style:normal; font-weight:500; }
+  .h-pane .rule { border-top:1px solid var(--term-border); margin:.4em 0; }
+  .h-pane .bottom { margin-top:auto; }
+  .h-pane .cursor { display:inline-block; width:.55em; height:1em; background:var(--term-text); vertical-align:-.15em; }
+  .h-pane .ansi { display:flex; gap:.3em; margin-top:.5em; } .h-pane .ansi i { width:1.1em; height:.8em; display:block; border-radius:.15em; }
+
+  /* ── use it ── */
+  .use { display:grid; grid-template-columns:1fr auto; gap:14px; align-items:center; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .use .lbl { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; margin-bottom:6px; }
+  .use pre { margin:0; font-size:14px; white-space:pre-wrap; word-break:break-all; }
+  .use pre b { color:var(--theme-accent); font-weight:600; }
+  .use .btns { display:flex; gap:8px; }
+  .btn { padding:9px 14px; border-radius:8px; border:1px solid var(--line); font-weight:600; font-size:13px; color:var(--fg); }
+  .btn.primary { background:var(--theme-accent); border-color:var(--theme-accent); color:#111; }
+  .foot { color:var(--muted); font-size:13px; }
+  .foot a { color:var(--muted); text-decoration:underline; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><img src="https://raw.githubusercontent.com/eduwass/monotheme/main/assets/monotheme-logo.png" alt="">monotheme <span>/ browse</span></a>
+  <nav>
+    <a href="./#install">Install</a>
+    <a href="https://github.com/eduwass/monotheme">GitHub</a>
+  </nav>
+</header>
+
+<div class="app">
+  <aside class="side">
+    <div class="search">
+      <input id="q" type="search" placeholder="Search the VS Code Marketplace…" autocomplete="off" spellcheck="false">
+      <span class="hint">sort</span>
+      <select id="sort"><option value="installs">most installed</option><option value="trending">trending</option><option value="relevance">relevance</option><option value="recent">recently updated</option></select>
+    </div>
+    <div class="lists">
+      <h2>Marketplace</h2>
+      <ul id="results"></ul>
+      <p id="results-empty" hidden>no theme extensions match</p>
+      <button id="more" hidden>more…</button>
+      <h2>Ships with monotheme</h2>
+      <ul id="builtin"></ul>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="head">
+      <h1 id="meta-name">…</h1>
+      <span class="tag" id="meta-type"></span>
+      <span class="src" id="meta-src"></span>
+      <div id="swatches" title="ANSI palette the terminal gets"></div>
+    </div>
+    <div id="status" class="status" hidden></div>
+    <div id="variants" hidden></div>
+
+    <div class="controls">
+      <span>editor:</span>
+      <label><input type="radio" name="flavor" value="vscode" checked> VS Code</label>
+      <label><input type="radio" name="flavor" value="zed"> Zed</label>
+      <span style="margin-left:auto">click a window to focus it — the accent goes around the focused one</span>
+    </div>
+
+    <div class="desktop" id="desktop">
+      <div class="bar">
+        <div class="pills">
+          <span class="pill focused">1<i></i></span><span class="pill active">2</span><span class="pill filled">3<i class="down"></i></span><span class="pill filled">4</span><span class="pill">5</span><span class="pill">6</span>
+        </div>
+        <span class="title"><b>●</b> Cursor — monotheme</span>
+        <span class="clock">Mon 31 Aug 16:20</span>
+      </div>
+
+      <section class="win focused" id="win-editor">
+        <div class="tb"><div class="dots"><i></i><i></i><i></i></div><span>project.ts — monotheme</span></div>
+        <div class="body">
+          <div class="activity"><i></i><i></i><i></i><i></i></div>
+          <div class="sidebar">
+            <h4>EXPLORER</h4>
+            <div class="d">▾ monotheme</div>
+            <div class="f">▾ src</div>
+            <div class="f sel">&nbsp;&nbsp;project.ts</div>
+            <div class="f">&nbsp;&nbsp;load.ts</div>
+            <div class="f">&nbsp;&nbsp;cli.ts</div>
+            <div class="f">▸ targets</div>
+            <div class="f">▸ themes</div>
+            <div class="f">&nbsp;&nbsp;package.json</div>
+            <div class="f">&nbsp;&nbsp;README.md</div>
+          </div>
+          <div class="editor">
+            <div class="tabs"><span class="on">project.ts</span><span>cli.ts</span><span>README.md</span></div>
+            <div class="codewrap">
+              <div class="gutter"><span>1</span><span>2</span><span>3</span><span>4</span><span class="on">5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span></div>
+              <div id="code"></div>
+            </div>
+          </div>
+        </div>
+        <div class="statusbar"><span>⎇ main</span><span>⊗ 0 ⚠ 0</span><span class="r"><span>Ln 5, Col 32</span><span>UTF-8</span><span>TypeScript</span></span></div>
+      </section>
+
+      <section class="win" id="win-herdr">
+        <div class="tb"><div class="dots"><i></i><i></i><i></i></div><span>herdr</span></div>
+        <div class="herdr">
+          <aside class="h-side">
+            <div class="h-title">spaces</div>
+            <div class="h-space active"><span class="h-dot working"></span><div><strong>monotheme</strong><small>snap-target</small></div></div>
+            <div class="h-space"><span class="h-dot blocked"></span><div><strong>web-dashboard</strong><small>feat/usage-charts</small></div></div>
+            <div class="h-space"><span class="h-dot done"></span><div><strong>data-pipeline</strong><small>backfill/events-v2</small></div></div>
+            <div class="h-title h-agents"><span>agents</span><span>grouped</span></div>
+            <div class="h-agent working active"><span>●</span><div><strong>monotheme</strong><small>claude · working</small></div></div>
+            <div class="h-agent"><span>○</span><div><strong>explore</strong><small>opencode · idle</small></div></div>
+            <div class="h-agent blocked"><span>◉</span><div><strong>web-dashboard</strong><small>claude · needs you</small></div></div>
+            <div class="h-agent done"><span>●</span><div><strong>data-pipeline</strong><small>codex · done</small></div></div>
+          </aside>
+          <div class="h-main">
+            <div class="h-tabs"><span>opencode</span><span class="active">herdr</span><span>+</span></div>
+            <div class="h-panes">
+              <div class="h-pane focused">
+                <div><span class="cc">▐▛███▜▌</span> <b>Claude Code</b> <span class="dim">v2.1</span></div>
+                <div class="dim">~/Sites/monotheme</div>
+                <br>
+                <div><b>❯</b> preview this theme across the desktop</div>
+                <br>
+                <div><span class="cc">●</span> Reading <span class="str">src/project.ts</span>…</div>
+                <div><span class="cc">●</span> Plan:</div>
+                <div class="dim">&nbsp;&nbsp;· herdr → [theme.custom]</div>
+                <div class="dim">&nbsp;&nbsp;· sketchybar → pills from the same palette</div>
+                <div class="bottom">
+                  <div class="rule"></div>
+                  <div><b>❯</b> <span class="cursor"></span></div>
+                  <div class="rule"></div>
+                  <div class="dim"><span class="blue">~/Sites/monotheme</span> › <span class="green">snap-target</span></div>
+                </div>
+              </div>
+              <div class="h-pane">
+                <div class="prompt">~/Sites/monotheme <em>snap-target</em></div>
+                <div><b>❯</b> <span class="cmd">theme</span> set tokyo-night</div>
+                <div class="dim">  ✓ ghostty → ~/.config/ghostty/theme</div>
+                <div class="dim">  ✓ herdr → [theme.custom]</div>
+                <div class="dim">  ✓ sketchybar → theme_change event</div>
+                <div class="dim">  ✓ cursor → workbench.colorTheme</div>
+                <br>
+                <div><span class="green">set:</span> Tokyo Night <span class="dim">(dark)</span> <span class="dim">in 190ms</span></div>
+                <br>
+                <div><b>❯</b> <span class="cmd">git</span> status <span class="str">--short</span></div>
+                <div><span class="green">M</span> src/project.ts&nbsp;&nbsp;<span class="red">D</span> old.ts</div>
+                <div class="ansi" title="the 16 ANSI colours"><i style="background:var(--term-bg)"></i><i style="background:var(--term-red)"></i><i style="background:var(--term-green)"></i><i style="background:var(--term-yellow)"></i><i style="background:var(--term-blue)"></i><i style="background:var(--accent)"></i><i style="background:var(--term-muted)"></i><i style="background:var(--term-text)"></i></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="use">
+      <div>
+        <div class="lbl">use it</div>
+        <pre class="mono"><code id="cmd">…</code></pre>
+      </div>
+      <div class="btns">
+        <button class="btn primary" id="copy">copy</button>
+        <a class="btn" id="open-market" target="_blank" rel="noopener" hidden>Marketplace ↗</a>
+      </div>
+    </div>
+    <p class="foot">The preview runs monotheme's real adapters in your browser: the herdr window is painted with the <code>[theme.custom]</code> block herdr receives, the status bar with the same pill tiers as the sketchybar config, the editor with the theme's own workbench colours (or the Zed projection). Themes are pulled straight from the Marketplace; nothing leaves your browser. <a href="https://github.com/eduwass/monotheme/blob/main/tools/site/palette.ts">How the mapping works.</a></p>
+  </main>
+</div>
+<script type="module" src="./browse.js"></script>
+</body>
+</html>

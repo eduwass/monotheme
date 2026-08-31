@@ -31,7 +31,8 @@
     "embed": "bun scripts/embed-themes.ts",
     "fonts:gen": "bun scripts/gen-font-catalog.ts",
     "fonts:update": "curl -fsSL -o vendor/font-catalogs/programmingfonts.json https://raw.githubusercontent.com/braver/programmingfonts/master/fonts.json && curl -fsSL -o vendor/font-catalogs/nerd-fonts.json https://raw.githubusercontent.com/ryanoasis/nerd-fonts/master/bin/scripts/lib/fonts.json && bun scripts/gen-font-catalog.ts",
-    "build:binary": "bun scripts/embed-themes.ts && bun scripts/embed-targets.ts && bun scripts/gen-font-catalog.ts && bun build --compile src/cli.ts --outfile dist/theme"
+    "build:binary": "bun scripts/embed-themes.ts && bun scripts/embed-targets.ts && bun scripts/gen-font-catalog.ts && bun build --compile src/cli.ts --outfile dist/theme",
+    "site:build": "bun tools/site/build.ts"
   },
   "dependencies": {
     "json5": "^2.2.3",

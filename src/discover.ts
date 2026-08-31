@@ -52,9 +52,8 @@ function bundledExtRoots(): string[] {
 
 const EXT_ROOTS = [...USER_EXT_ROOTS, ...bundledExtRoots()];
 
-export function slugify(s: string): string {
-  return s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
+import { slugify } from "./slug.ts";
+export { slugify };
 
 // Theme libraries on disk: the config-home user/vendored dir (authoritative for
 // user data) plus the shipped default library. Scanned in that order.
