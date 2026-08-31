@@ -82,7 +82,7 @@
   .legend i { width:11px; height:11px; border-radius:3px; display:inline-block; }
 
   /* code blocks */
-  pre.code { background:#16152e; border:1px solid var(--line); border-radius:12px; padding:18px 20px;
+  pre.code { background:var(--bg2); border:1px solid var(--line); border-radius:12px; padding:18px 20px;
     overflow-x:auto; min-width:0; max-width:100%; font-size:14px; color:#e7e3ff; }
   pre.code .c { color:var(--muted); }       /* comment */
   pre.code .k { color:var(--accent); }       /* command/keyword */
@@ -102,6 +102,22 @@
   .chips { display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
   .chip { border:1px solid var(--line); background:rgba(45,43,85,.5); border-radius:999px;
     padding:7px 14px; font-size:13px; color:#e7e3ff; font-family:'JetBrains Mono',monospace; }
+
+  /* marketplace strip */
+  .mkt-strip { display:flex; gap:12px; overflow-x:auto; padding:4px 2px 12px; scrollbar-width:thin; }
+  .mkt-card { flex:0 0 auto; width:128px; display:flex; flex-direction:column; align-items:center; gap:7px; padding:14px 10px 12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px; cursor:pointer; color:var(--fg); font:inherit; text-align:center; }
+  .mkt-card { position:relative; }
+  .mkt-card:hover { border-color:var(--muted); }
+  .mkt-card { text-decoration:none; }
+  .mkt-card i { width:44px; height:44px; border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center;
+    background:var(--bg2); border:1px solid var(--line); font-style:normal; font-size:20px; }
+  .mkt-card i img { width:100%; height:100%; object-fit:cover; }
+  .mkt-card span { font-size:13px; font-weight:600; line-height:1.25; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .mkt-card small { font-size:11px; color:var(--muted); }
+  .mkt-note { color:var(--muted); font-size:13px; min-height:20px; margin:4px 0 0; }
+  .mkt-note b { color:var(--fg); }
+  html { transition:background-color .25s; } body, .card, .mkt-card, pre.code, .video-card { transition:background-color .25s, border-color .25s; }
 
   #contribute { padding-bottom:112px; }
   footer { border-top:1px solid var(--line); padding:48px 0; margin-top:24px; color:var(--muted); font-size:14px; }
@@ -133,6 +149,14 @@
       <source src="https://github.com/user-attachments/assets/7d154016-a72d-4e58-b390-9d886b22e64c" type="video/mp4">
     </video>
   </div>
+</section>
+
+<!-- marketplace strip: live proof the engine runs anywhere -->
+<section id="marketplace" class="wrap" style="padding:40px 0 24px">
+  <h2 style="font-size:22px">Fresh from the VS Code Marketplace</h2>
+  <p class="lead" style="margin-bottom:18px">The most-installed themes right now — click one to preview it across a whole desktop: editor, terminal, status bar and window accents, extracted from the real extension in your browser.</p>
+  <div class="mkt-strip" id="mkt-strip"></div>
+  <p class="mkt-note" id="mkt-note">loading the Marketplace…</p>
 </section>
 
 <!-- how it works -->
@@ -316,5 +340,6 @@
 
   createRoot(document.getElementById('flow')).render(html`<${App} />`);
 </script>
+<script type="module" src="./home.js"></script>
 </body>
 </html>

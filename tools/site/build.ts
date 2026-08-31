@@ -34,9 +34,9 @@ writeFileSync(join(import.meta.dir, "catalog.gen.ts"),
   `export const DEFAULT_THEME = { slug: ${JSON.stringify(DEFAULT)}, theme: ${JSON.stringify(defTheme)} };\n`);
 
 const res = await Bun.build({
-  entrypoints: [join(import.meta.dir, "browse.ts")],
+  entrypoints: [join(import.meta.dir, "browse.ts"), join(import.meta.dir, "home.ts")],
   outdir: join(ROOT, "docs"),
-  naming: "browse.js",
+  naming: "[name].js",
   target: "browser",
   minify: true,
   sourcemap: "none",
@@ -45,5 +45,5 @@ const res = await Bun.build({
   banner: 'var process={env:{},platform:"browser",cwd:function(){return "/"}};',
 });
 if (!res.success) { for (const l of res.logs) console.error(l); process.exit(1); }
-const out = res.outputs[0]!;
-console.log(`docs/browse.js  ${(out.size / 1024).toFixed(0)} KB  (${catalog.length} built-in themes, default ${DEFAULT})`);
+for (const out of res.outputs) console.log(`docs/${out.path.split("/").pop()}  ${(out.size / 1024).toFixed(0)} KB`);
+console.log(`(${catalog.length} built-in themes, default ${DEFAULT})`);
