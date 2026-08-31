@@ -3,7 +3,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
-import JSON5 from "json5";
+import { parseJson5 } from "./util.ts";
 import { REPO_THEMES, USER_THEMES } from "./paths.ts";
 
 export interface ThemeEntry {
@@ -70,7 +70,7 @@ function resolveNls(extDir: string, label: string): string {
     const p = join(extDir, f);
     if (!existsSync(p)) continue;
     try {
-      const nls = JSON5.parse(readFileSync(p, "utf8"));
+      const nls = parseJson5(readFileSync(p, "utf8"));
       const v = nls[m[1]!];
       // entries can be a string or { message: string }
       const s = typeof v === "string" ? v : v?.message;
@@ -96,7 +96,7 @@ export function discover(): ThemeEntry[] {
       const pkgPath = join(root, ext, "package.json");
       if (!existsSync(pkgPath)) continue;
       let pkg: any;
-      try { pkg = JSON5.parse(readFileSync(pkgPath, "utf8")); } catch { continue; }
+      try { pkg = parseJson5(readFileSync(pkgPath, "utf8")); } catch { continue; }
       const themes = pkg?.contributes?.themes;
       if (!Array.isArray(themes)) continue;
       for (const th of themes) {
@@ -121,7 +121,7 @@ export function discover(): ThemeEntry[] {
       if (!f.endsWith(".json")) continue;
       const path = join(dir, f);
       let appearance: "dark" | "light" = "dark";
-      try { appearance = (JSON5.parse(readFileSync(path, "utf8")).type as "dark" | "light") ?? "dark"; } catch {}
+      try { appearance = (parseJson5(readFileSync(path, "utf8")).type as "dark" | "light") ?? "dark"; } catch {}
       const label = f.replace(/\.json$/, "");
       add({ label, slug: slugify(label), appearance, path, source: "local" });
     }

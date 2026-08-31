@@ -107,11 +107,12 @@ export function defineTarget(t: Target): Target {
 const HOME = homedir();
 const osOf = (): OS => (process.platform === "darwin" ? "mac" : process.platform === "win32" ? "win" : "linux");
 
-/** Build the context for one theme application. When `pending` is given, `run`
- *  commands (reload signals) are spawned concurrently and collected there instead
- *  of blocking one-by-one — await Promise.all(pending) after applying all targets
- *  so every app repaints at once rather than in serial order. */
-export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, fonts: FontsConfig | null = null, slot = "monotheme", pending?: Promise<void>[]): Ctx {
+/** Build the context for one theme application. `run` commands (reload signals)
+ *  are fire-and-forget: spawned detached so the CLI returns as soon as configs
+ *  are written, while apps repaint on their own. Waiting on them cost 2–3s per
+ *  switch (`bat cache --build`, process-table scans) and their errors were
+ *  swallowed anyway — see scripts/bench-set.ts. */
+export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEntry, fonts: FontsConfig | null = null, slot = "monotheme"): Ctx {
   const os = osOf();
   const cfgRoot = process.env.XDG_CONFIG_HOME || (os === "win" ? process.env.APPDATA || join(HOME, "AppData", "Roaming") : join(HOME, ".config"));
   const dataRoot = process.env.XDG_DATA_HOME || (os === "win" ? process.env.LOCALAPPDATA || join(HOME, "AppData", "Local") : join(HOME, ".local", "share"));
@@ -131,15 +132,7 @@ export function makeCtx(theme: VscodeTheme, palette: Projection, entry: ThemeEnt
     write: (path, content) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, content); },
     read: (path) => { try { return readFileSync(path, "utf8"); } catch { return ""; } },
     run: (cmd) => {
-      if (!pending) { try { execSync(cmd, { stdio: "ignore" }); } catch {} return; }
-      pending.push(new Promise<void>((res) => {
-        const ch = spawn(cmd, { shell: true, stdio: "ignore" });
-        // cap a hung reload at 15s (execSync had no cap at all); errors stay swallowed.
-        const t = setTimeout(() => { try { ch.kill("SIGKILL"); } catch {} }, 15000);
-        const done = () => { clearTimeout(t); res(); };
-        ch.on("error", done);
-        ch.on("exit", done);
-      }));
+      try { spawn(cmd, { shell: true, stdio: "ignore", detached: true }).on("error", () => {}).unref(); } catch {}
     },
     setJson: (file, key, value) => patchJsonStringKey(file, key, value),
     font: (role) => resolveFont(fonts, role),

@@ -1,6 +1,6 @@
 // Load + normalize a VSCode color theme (JSONC) into a stable shape.
 import { readFileSync } from "node:fs";
-import JSON5 from "json5";
+import { parseJson5 } from "./util.ts";
 
 export interface TokenColor {
   name?: string;
@@ -19,7 +19,7 @@ export interface VscodeTheme {
 
 /** Read a VSCode/Cursor theme JSON (tolerates comments + trailing commas). */
 export function loadTheme(path: string): VscodeTheme {
-  const raw = JSON5.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+  const raw = parseJson5(readFileSync(path, "utf8")) as Record<string, unknown>;
   // shiki/vscode compat: some themes use `settings` instead of `tokenColors`.
   const tokenColors = (raw.tokenColors ?? raw.settings ?? []) as TokenColor[];
   const colors = (raw.colors ?? {}) as Record<string, string>;

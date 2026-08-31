@@ -57,7 +57,9 @@ export default defineTarget({
     c.setJson(c.config("opencode", "tui.json"), "theme", "monotheme");
     // SIGUSR2 hot-reloads the TUI; `opencode serve` has no handler (the signal would
     // kill it), so signal only non-serve processes.
-    c.run(`for p in $(pgrep -x opencode 2>/dev/null); do case "$(ps -o args= -p $p 2>/dev/null)" in *serve*) ;; *) kill -USR2 $p 2>/dev/null ;; esac; done; true`);
+    // One process-table scan (ps), not one per pid — pgrep+ps per pid cost ~2s
+    // with a few opencode instances on a busy box.
+    c.run(`ps -eo pid=,args= | awk '$2 ~ /(^|\\/)opencode$/ && $0 !~ / serve( |$)/ { print $1 }' | xargs -r -n1 kill -USR2 2>/dev/null; true`);
     return "themes/monotheme.json (SIGUSR2 live-reload)";
   },
 });

@@ -1,3 +1,4 @@
+import JSON5 from "json5";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 
 /**
@@ -8,6 +9,12 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
  * ("terminal.integrated.fontFamily") count as top-level; genuinely nested
  * objects (Zed's "terminal": { "font_family" }) are not handled here.
  */
+/** Parse JSON, falling back to JSON5 for comments/trailing commas. Native
+ *  JSON.parse is ~40x faster than JSON5 and most theme files are strict JSON. */
+export function parseJson5(text: string): any {
+  try { return JSON.parse(text); } catch { return JSON5.parse(text); }
+}
+
 export function patchJsonStringKey(path: string, key: string, value: string | number): boolean {
   if (!existsSync(path)) return false;
   let s = readFileSync(path, "utf8");

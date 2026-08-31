@@ -55,12 +55,9 @@ async function applyTheme(nameOrPath: string, opSilent = false, doPropagate = fa
 
   // canonical = the fully-resolved theme; portable across machines.
   const canonical = JSON.stringify({ name: theme.name, type: theme.type, colors: theme.colors, tokenColors: theme.tokenColors });
-  // kick off the (slow, ssh-bound) peer sync FIRST so it overlaps the local apply.
-  const peerMsg = doPropagate ? propagate(canonical) : Promise.resolve(null);
-  // config writes run synchronously (fast); reload signals collect into `pending`
-  // and fire concurrently, so every app repaints at once instead of in sequence.
-  const pending: Promise<void>[] = [];
-  const ctx = makeCtx(theme, p, entry, loadFonts(), "monotheme", pending);
+  // peer sync (ssh-bound, ~2s) runs detached — we don't wait for it.
+  const peerMsg = doPropagate ? propagate(canonical) : null;
+  const ctx = makeCtx(theme, p, entry, loadFonts(), "monotheme");
   for (const t of TARGETS) {
     const r = applyTarget(t, ctx);
     if (!opSilent) console.log(`  ${r.present ? (r.ok ? "✓" : "✗") : "·"} ${r.status}`);
@@ -82,27 +79,20 @@ async function applyTheme(nameOrPath: string, opSilent = false, doPropagate = fa
       if (!opSilent) console.log(`  ✓ vendored → ${vendored.replace(process.env.HOME || "~", "~")}`);
     }
   }
-  await Promise.all(pending);
-  const msg = await peerMsg;
-  if (msg) console.log(msg);
+  if (peerMsg) console.log(peerMsg);
   if (!opSilent) console.log(`\nset: ${theme.name} (${theme.type})`);
   return { slug: entry.slug, canonical };
 }
 
 // Mirror the switch to the peer machine by shipping the resolved theme itself
-// (not just its name — the peer may not have it installed). Best-effort; runs
-// concurrently with the local apply and resolves to a status line to print.
-function propagate(canonical: string): Promise<string | null> {
-  const b64 = Buffer.from(canonical).toString("base64");
-  const peer = peerThemeCommand(b64);
-  if (!peer) return Promise.resolve(null);
-  const fail = `  · ${peer.peer} not synced (unreachable) — it'll match next time it's set there`;
-  return new Promise((res) => {
-    const ch = spawn(peer.cmd, { shell: true, stdio: "ignore" });
-    const t = setTimeout(() => { try { ch.kill("SIGKILL"); } catch {} }, 30000);
-    ch.on("error", () => { clearTimeout(t); res(fail); });
-    ch.on("exit", (code) => { clearTimeout(t); res(code === 0 ? `  ↪ synced ${peer.peer}` : fail); });
-  });
+// (not just its name — the peer may not have it installed). Best-effort and
+// fire-and-forget: detached so the local switch never waits on ssh. If the peer
+// is unreachable it simply matches the next time a theme is set there.
+function propagate(canonical: string): string | null {
+  const peer = peerThemeCommand(Buffer.from(canonical).toString("base64"));
+  if (!peer) return null;
+  try { spawn(peer.cmd, { shell: true, stdio: "ignore", detached: true }).on("error", () => {}).unref(); } catch {}
+  return `  ↪ syncing ${peer.peer} (background)`;
 }
 
 // A Marketplace theme is only colour DATA for terminals/etc.; Cursor/VSCode need
