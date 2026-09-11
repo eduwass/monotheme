@@ -154,6 +154,39 @@ test("opencode: full semantic schema, accent gold, syntax mapped", () => {
   expect(o.diffAdded.dark).toBe(project(sop).success);
 });
 
+test("vicinae: native TOML preserves dark/light palettes and separate selection colors", () => {
+  const { toVicinae, default: target } = require("../src/targets/vicinae.ts");
+  const { makeCtx } = require("../src/target-kit.ts");
+  const light = loadTheme(resolve(D, "..", "themes", "github-light.json"));
+  for (const theme of [sop, light]) {
+    const p = project(theme);
+    const out = Bun.TOML.parse(toVicinae(theme));
+    expect(out.meta.variant).toBe(theme.type);
+    expect(out.meta.inherits).toBe(`vicinae-${theme.type}`);
+    expect(out.colors.core.background).toBe(p.bg);
+    expect(out.colors.core.accent).toBe(p.accent);
+    expect(out.colors.accents.red).toBe(p.ansi[1]);
+  }
+  const custom = { ...sop, name: 'Theme "with quotes"', colors: { ...sop.colors,
+    "list.activeSelectionBackground": "#ff000080", "list.activeSelectionForeground": "#abcdef",
+    "editor.selectionBackground": "#00ff00", "editor.selectionForeground": "#123456" } };
+  const out = Bun.TOML.parse(toVicinae(custom));
+  expect(out.meta.description).toBe('Generated from Theme "with quotes"');
+  expect(out.colors.list.item.selection.foreground).toBe("#abcdef");
+  expect(out.colors.list.item.selection.background).toMatch(/^#[0-9a-fA-F]{6}$/);
+  expect(out.colors.text.selection.background).toBe("#00ff00");
+  expect(out.colors.text.selection.foreground).toBe("#123456");
+  const ctx = { ...makeCtx(sop, project(sop), {} as any),
+    config: (...p: string[]) => `/config/${p.join("/")}`,
+    data: (...p: string[]) => `/data/${p.join("/")}`,
+    has: (path: string) => path === "/Applications/Vicinae.app", hasCmd: () => false };
+  expect(target.file(ctx)).toBe("/data/vicinae/themes/monotheme.toml");
+  expect(target.detect({ ...ctx, mac: true })).toBe(true);
+  expect(target.reload({ ...ctx, mac: true })).toContain("/Applications/Vicinae.app/Contents/MacOS/vicinae-cli");
+  expect(target.reload({ ...ctx, mac: false })).toBe("vicinae theme set monotheme");
+  expect(target.detect({ ...ctx, mac: false })).toBe(false);
+});
+
 test("claude: name/base/overrides with gold accent + diff colors", () => {
   const { toClaude } = require("../src/targets/claude.ts");
   const cl = JSON.parse(toClaude(sop));

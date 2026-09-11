@@ -48,6 +48,14 @@ _fzf_theme_reload() { [[ -f "$HOME/.config/fzf/theme.sh" ]] && { unset FZF_DEFAU
 precmd_functions+=(_fzf_theme_reload)
 ```
 
+### Vicinae
+
+The adapter writes `$XDG_DATA_HOME/vicinae/themes/monotheme.toml` (defaults to
+`~/.local/share/vicinae/themes/monotheme.toml`) and activates it with
+`vicinae theme set monotheme`. macOS DMG installs use the bundled CLI even when
+`vicinae` isn't on PATH. Subsequent theme changes update the same hot-reloaded
+file. Config imports, shortcuts, and extension preferences are untouched.
+
 ## Follow the system light/dark mode (macOS, optional)
 
 ```sh

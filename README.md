@@ -57,7 +57,8 @@ match what you'd see in the editor.
 | Editors | VSCode, Cursor, Zed, Neovim, Sublime Text (chrome + TextMate syntax) |
 | Agents / dev | opencode, Claude Code, hunk, tuicr, herdr |
 | Syntax export | `.tmTheme` (bat/Sublime), shiki JSON, base16 |
-| macOS / extras | system accent color, window borders (JankyBorders, rift), Raycast |
+| Launchers | Vicinae (macOS/Linux, native TOML + live reload), Raycast (macOS) |
+| macOS / extras | system accent color, window borders (JankyBorders, rift) |
 
 Each target detects whether the tool is present and no-ops if not, so you only
 theme what you have.
