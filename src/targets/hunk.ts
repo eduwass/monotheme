@@ -1,22 +1,9 @@
 import { defineTarget } from "../target-kit.ts";
-import { toShiki } from "../formats/shiki.ts";
 import { pick, stripAlpha } from "../load.ts";
-import { resolveToken } from "../project.ts";
 
-// hunk (0.15+) themes itself from TWO places, and we must drive BOTH or the UI
-// and the syntax fall out of sync:
-//   1. config.toml's [custom_theme] / [custom_theme.syntax] tables — all the
-//      chrome (background, panels, borders, accent, line numbers, badges, the
-//      9-token syntax fallback). This is what colours the whole TUI.
-//   2. syntax_theme = "monotheme.json" — a full Shiki/VSCode theme used for the
-//      actual diff syntax highlighting.
-// The old target only rewrote (2), so switching to a light theme left the purple
-// chrome from (1) frozen in place. Now we regenerate both from the active theme.
-//
-// We preserve everything in config.toml ABOVE the first [custom_theme] line (the
-// user's own settings: theme="custom", hunk_headers, file_icons, borderless,
-// menu_bar, comments) and replace the two colour tables wholesale. hunk keeps
-// those tables last in the file, so a head-split is safe.
+// Upstream Hunk 0.22+: chrome and TextMate syntax colors live in config.toml.
+// Preserve user settings above [custom_theme] and replace the generated tables.
+// No fork-only syntax_theme JSON or deprecated nine-role syntax table.
 export default defineTarget({
   name: "hunk",
   detect: (c) => c.has(c.config("hunk", "config.toml")),
@@ -26,13 +13,6 @@ export default defineTarget({
     const col = (...keys: string[]) => {
       const v = pick(t.colors, keys);
       return v ? stripAlpha(v) : undefined;
-    };
-    const tok = (...scopes: string[]) => {
-      for (const s of scopes) {
-        const r = resolveToken(t.tokenColors, s);
-        if (r?.fg) return stripAlpha(r.fg);
-      }
-      return undefined;
     };
 
     // hunk requires a built-in base theme to extend; match its light/dark to ours
@@ -70,7 +50,6 @@ export default defineTarget({
     const palette: Record<string, string> = {
       base,
       label: t.name,
-      syntax_theme: "monotheme.json",
       background: p.bg,
       panel: p.bgPanel,
       panelAlt: col("editorWidget.background", "panel.background") ?? p.bgPanel,
@@ -104,20 +83,22 @@ export default defineTarget({
       noteTitleText: p.fg,
     };
 
-    const syntax: Record<string, string> = {
-      default: p.fg,
-      keyword: tok("keyword") ?? p.ansi[5]!,
-      string: tok("string") ?? p.ansi[2]!,
-      comment: tok("comment") ?? p.fgMuted,
-      number: tok("constant.numeric") ?? p.ansi[1]!,
-      function: tok("entity.name.function") ?? p.ansi[3]!,
-      property: tok("variable.other.property", "support.type.property-name") ?? p.fg,
-      type: tok("entity.name.type", "support.type") ?? p.ansi[6]!,
-      punctuation: tok("punctuation") ?? p.fg,
-    };
+    // Upstream 0.22+ accepts TextMate selectors directly. Keep every foreground
+    // rule, including language-specific selectors; later duplicate rules win.
+    // ponytail: upstream accepts colors only, not token background/fontStyle.
+    const syntax = new Map<string, string>();
+    for (const rule of t.tokenColors) {
+      if (!rule.settings.foreground || !rule.scope) continue;
+      for (const group of Array.isArray(rule.scope) ? rule.scope : [rule.scope]) {
+        for (const selector of group.split(",").map((s) => s.trim()).filter(Boolean)) {
+          syntax.delete(selector);
+          syntax.set(selector, stripAlpha(rule.settings.foreground));
+        }
+      }
+    }
 
     const toml = (table: string, rows: Record<string, string>) =>
-      `[${table}]\n` + Object.entries(rows).map(([k, v]) => `${k} = "${v}"`).join("\n") + "\n";
+      `[${table}]\n` + Object.entries(rows).map(([k, v]) => `${JSON.stringify(k)} = ${JSON.stringify(v)}`).join("\n") + "\n";
 
     const cfgPath = c.config("hunk", "config.toml");
     const existing = c.read(cfgPath);
@@ -126,11 +107,8 @@ export default defineTarget({
     // the file had no custom theme yet.
     const head = idx >= 0 ? existing.slice(0, idx) : (existing ? existing.trimEnd() + "\n\n" : 'theme = "custom"\n\n');
 
-    c.write(cfgPath, head + toml("custom_theme", palette) + "\n" + toml("custom_theme.syntax", syntax));
+    c.write(cfgPath, head + toml("custom_theme", palette) + "\n" + toml("custom_theme.syntax_scopes", Object.fromEntries(syntax)));
 
-    // the full Shiki theme for diff syntax highlighting (the syntax_theme slot).
-    c.write(c.config("hunk", "monotheme.json"), toShiki(t));
-
-    return `config.toml [custom_theme] + monotheme.json`;
+    return `config.toml [custom_theme] + syntax_scopes`;
   },
 });
